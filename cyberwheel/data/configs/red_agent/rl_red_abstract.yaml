@@ -1,0 +1,848 @@
+action_space: RedDiscreteActionSpace
+entry_host: host1 # optional; defaults to random user
+leader: server1 # optional; defaults to random server
+class: RLAbstractAgent
+rl: true
+
+
+actions:
+
+  LinuxLateralMovement:
+    class: LinuxLateralMovement
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  ExtraWindowMemoryInjection:
+    class: ExtraWindowMemoryInjection
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ScheduledTask:
+    class: ScheduledTask
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  VNC:
+    class: VNC
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  SystemOwnerUserDiscovery:
+    class: SystemOwnerUserDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  ContainerandResourceDiscovery:
+    class: ContainerandResourceDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  PowerShellProfile:
+    class: PowerShellProfile
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ContainerOrchestrationJob:
+    class: ContainerOrchestrationJob
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  BypassUserAccountControl:
+    class: BypassUserAccountControl
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SudoandSudoCaching:
+    class: SudoandSudoCaching
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ServicesRegistryPermissionsWeakness:
+    class: ServicesRegistryPermissionsWeakness
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  GroupPolicyDiscovery:
+    class: GroupPolicyDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  BootorLogonAutostartExecution:
+    class: BootorLogonAutostartExecution
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ServiceStop:
+    class: ServiceStop
+    reward:
+      immediate: 100
+      recurring: 0
+    phase: impact
+
+  ActiveSetup:
+    class: ActiveSetup
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  DomainTrustModification:
+    class: DomainTrustModification
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  WindowsService:
+    class: WindowsService
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SystemChecks:
+    class: SystemChecks
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  Cron:
+    class: Cron
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  DomainGroups:
+    class: DomainGroups
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  PrintProcessors:
+    class: PrintProcessors
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  DLLSearchOrderHijacking:
+    class: DLLSearchOrderHijacking
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SystemServiceDiscovery:
+    class: SystemServiceDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  NetworkSniffing:
+    class: NetworkSniffing
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  NetworkShareDiscovery:
+    class: NetworkShareDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  PeripheralDeviceDiscovery:
+    class: PeripheralDeviceDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  SystemInformationDiscovery:
+    class: SystemInformationDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  ReplicationThroughRemovableMedia:
+    class: ReplicationThroughRemovableMedia
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  ThreadExecutionHijacking:
+    class: ThreadExecutionHijacking
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ApplicationShimming:
+    class: ApplicationShimming
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  PortMonitors:
+    class: PortMonitors
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  LoginHook:
+    class: LoginHook
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ProcessInjection:
+    class: ProcessInjection
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  EscapetoHost:
+    class: EscapetoHost
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ShortcutModification:
+    class: ShortcutModification
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ApplicationWindowDiscovery:
+    class: ApplicationWindowDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  SMBWindowsAdminShares:
+    class: SMBWindowsAdminShares
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  SecuritySupportProvider:
+    class: SecuritySupportProvider
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  LaunchDaemon:
+    class: LaunchDaemon
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  CloudInfrastructureDiscovery:
+    class: CloudInfrastructureDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  PathInterceptionbySearchOrderHijacking:
+    class: PathInterceptionbySearchOrderHijacking
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  GroupPolicyModification:
+    class: GroupPolicyModification
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  BrowserInformationDiscovery:
+    class: BrowserInformationDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  WindowsRemoteManagement:
+    class: WindowsRemoteManagement
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  DefaultAccounts:
+    class: DefaultAccounts
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  TimeProviders:
+    class: TimeProviders
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  Trap:
+    class: Trap
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  DynamicLinkerHijacking:
+    class: DynamicLinkerHijacking
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  CreateProcesswithToken:
+    class: CreateProcesswithToken
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SetuidandSetgid:
+    class: SetuidandSetgid
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  WinlogonHelperDLL:
+    class: WinlogonHelperDLL
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  DistributedComponentObjectModel:
+    class: DistributedComponentObjectModel
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  ImageFileExecutionOptionsInjection:
+    class: ImageFileExecutionOptionsInjection
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SystemNetworkConfigurationDiscovery:
+    class: SystemNetworkConfigurationDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  AccessibilityFeatures:
+    class: AccessibilityFeatures
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  DomainTrustDiscovery:
+    class: DomainTrustDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  PasstheTicket:
+    class: PasstheTicket
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  FileandDirectoryDiscovery:
+    class: FileandDirectoryDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  AsynchronousProcedureCall:
+    class: AsynchronousProcedureCall
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  AppCertDLLs:
+    class: AppCertDLLs
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SystemNetworkConnectionsDiscovery:
+    class: SystemNetworkConnectionsDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  PortableExecutableInjection:
+    class: PortableExecutableInjection
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  LoginItems:
+    class: LoginItems
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  CloudStorageObjectDiscovery:
+    class: CloudStorageObjectDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  TokenImpersonationTheft:
+    class: TokenImpersonationTheft
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  InternalDefacement:
+    class: InternalDefacement
+    reward:
+      immediate: 100
+      recurring: 0
+    phase: impact
+
+  ProcessDiscovery:
+    class: ProcessDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  WindowsManagementInstrumentationEventSubscription:
+    class: WindowsManagementInstrumentationEventSubscription
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SoftwareDeploymentTools:
+    class: SoftwareDeploymentTools
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  ParentPIDSpoofing:
+    class: ParentPIDSpoofing
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ChangeDefaultFileAssociation:
+    class: ChangeDefaultFileAssociation
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  Emond:
+    class: Emond
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  RegistryRunKeysStartupFolder:
+    class: RegistryRunKeysStartupFolder
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  LocalGroups:
+    class: LocalGroups
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  KernelModulesandExtensions:
+    class: KernelModulesandExtensions
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SystemdTimers:
+    class: SystemdTimers
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ProcessHollowing:
+    class: ProcessHollowing
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  AccountAccessRemoval:
+    class: AccountAccessRemoval
+    reward:
+      immediate: 100
+      recurring: 0
+    phase: impact
+
+  PasswordPolicyDiscovery:
+    class: PasswordPolicyDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  EventTriggeredExecution:
+    class: EventTriggeredExecution
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  UnixShellConfigurationModification:
+    class: UnixShellConfigurationModification
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SIDHistoryInjection:
+    class: SIDHistoryInjection
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  DataEncryptedforImpact:
+    class: DataEncryptedforImpact
+    reward:
+      immediate: 100
+      recurring: 0
+    phase: impact
+
+  AuthenticationPackage:
+    class: AuthenticationPackage
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ComponentObjectModelHijacking:
+    class: ComponentObjectModelHijacking
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  LateralToolTransfer:
+    class: LateralToolTransfer
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  PathInterceptionbyUnquotedPath:
+    class: PathInterceptionbyUnquotedPath
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  StartupItems:
+    class: StartupItems
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SystemLanguageDiscovery:
+    class: SystemLanguageDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  QueryRegistry:
+    class: QueryRegistry
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  SecuritySoftwareDiscovery:
+    class: SecuritySoftwareDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  AppInitDLLs:
+    class: AppInitDLLs
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ResourceHijacking:
+    class: ResourceHijacking
+    reward:
+      immediate: 100
+      recurring: 0
+    phase: impact
+
+  Screensaver:
+    class: Screensaver
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  LaunchAgent:
+    class: LaunchAgent
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  DataDestruction:
+    class: DataDestruction
+    reward:
+      immediate: 100
+      recurring: 0
+    phase: impact
+
+  RCScripts:
+    class: RCScripts
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SystemdService:
+    class: SystemdService
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  RDPHijacking:
+    class: RDPHijacking
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  CloudServiceDiscovery:
+    class: CloudServiceDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  RemoteSystemDiscovery:
+    class: RemoteSystemDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  NetworkServiceDiscovery:
+    class: NetworkServiceDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  SoftwareDiscovery:
+    class: SoftwareDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  ReopenedApplications:
+    class: ReopenedApplications
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  PasstheHash:
+    class: PasstheHash
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  DLLSideLoading:
+    class: DLLSideLoading
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  RemoteDesktopProtocol:
+    class: RemoteDesktopProtocol
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: lateral-movement
+
+  LogonScriptWindows:
+    class: LogonScriptWindows
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  LSASSDriver:
+    class: LSASSDriver
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  CloudAccounts:
+    class: CloudAccounts
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SystemTimeDiscovery:
+    class: SystemTimeDiscovery
+    reward:
+      immediate: 20
+      recurring: 0
+    phase: discovery
+
+  At:
+    class: At
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  DynamiclinkLibraryInjection:
+    class: DynamiclinkLibraryInjection
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  InhibitSystemRecovery:
+    class: InhibitSystemRecovery
+    reward:
+      immediate: 100
+      recurring: 0
+    phase: impact
+
+  NetshHelperDLL:
+    class: NetshHelperDLL
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  LocalAccounts:
+    class: LocalAccounts
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  SystemShutdownReboot:
+    class: SystemShutdownReboot
+    reward:
+      immediate: 100
+      recurring: 0
+    phase: impact
+
+  COR_PROFILER:
+    class: COR_PROFILER
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: privilege-escalation
+
+  ARTPingSweep:
+    class: ARTPingSweep
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: pingsweep
+  
+  ARTPortScan:
+    class: ARTPortScan
+    reward:
+      immediate: 0
+      recurring: 0
+    phase: portscan
