@@ -1,22 +1,12 @@
 <a id="readme-top"></a>
 
-[![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
-
-<!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/ORNL/cyberwheel">
-    <img src="images/logo.png" alt="Logo" width="409" height="351">
-  </a>
 
-  <h3 align="center">Cyberwheel</h3>
+  <h3 align="center">Reinforcement Learning in Cyber Security</h3>
 
   <p align="center">
-    A reinforcement learning simulation environment focused on autonomous cyber defense
-    <br />
-    <br />
-    <a href="https://github.com/ORNL/cyberwheel/issues/new">Submit Issue</a>
+    A reinforcement learning simulation environment for training autonomous pentesting agents using different abstract levels for a stepwise learning approach.
   </p>
 </div>
 
@@ -27,82 +17,15 @@
   <summary>Table of Contents</summary>
   <ol>
     <li>
-      <a href="#updates">Updates</a>
-    </li>
-    <li>
-      <a href="#about-cyberwheel">About Cyberwheel</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
-    </li>
-    <li>
       <a href="#getting-started">Getting Started</a>
       <ul>
         <li><a href="#prerequisites">Prerequisites</a></li>
         <li><a href="#installation">Installation</a></li>
       </ul>
-    </li>
     <li><a href="#usage">Usage</a></li>
-    <li><a href="#license">License</a></li>
-    <li><a href="#contacts">Contacts</a></li>
   </ol>
 </details>
 
-## Updates
-
-### New Features! (Release v2.0)
-
-With the latest major update to cyberwheel, we've implemented various new features, namely Emulation and Multi-Agent support! The first iteration of our emulator environment is now live, with instructions on setup located in `cyberwheel/emulator/README.md`. Cyberwheel environments now also support the ability to train and evaluate multiple RL agents in tandem, allowing you to train an RL Red Agent against an RL Blue Agent, both learning simultaneously. A full list of all of the new features are listed in more detail below:
-
-#### Multi-agent Support
-As mentioned above, cyberwheel now supports the ability to train multiple agents in the environment. To do so, you just need to enter the red and blue agents' config filename in the 'red' and 'blue' arguments of the training configuration. You may use any of the RL Red/Blue YAML files in the `cyberwheel/data/configs` agent directories, and the training config YAML files in `cyberwheel/data/configs/environment` as a reference.
-
-#### Emulation
-For our emulator, we've incorporated the [FIREWHEEL](https://github.com/sandialabs/firewheel) network emulation tool by Sandia National Laboratories. More information on setting this up and getting it running can be found [here](emulator/README.md).
-
-
-#### Multi-Network Training
-We've also implemented the ability to train an agent on multiple different networks in one training run, by allowing three fixed maximum observation space sizes that an agent will train on. These sizes are:
-
-| Config Argument | Max # of hosts in network | Max # of subnets in network |
-| -------- | ------- | --------- |
-| `small` | 100 | 10 |
-| `medium` | 1000 | 100 |
-| `large` | 10000 |  1000 |
-
-This allows the singular policy to train a fixed obs space and action space on many different networks. During training, the network that the agent will train on in a given episode will be randomly selected from the ones listed. During the checkpoint evaluations of the training, evaluations will be run on all networks in the pool in order to judge the agent's individual performance.
-
-#### Next Steps
-
-Looking forward, there are various other features we are planning to add to Cyberwheel, many of which are listed here, along with some QoL changes:
-
-- [ ] Unit Testing
-- [ ] More modular red agent killchains
-- [ ] Detailed documentation
-- [ ] Multi-Agent Support (> 2 RL agents at a time)
-
-
-## About Cyberwheel
-
-Cyberwheel is a Reinforcement Learning (RL) simulation environment built for training and evaluating autonomous cyber defense models on simulated networks. It was built with modularity in mind, to allow users to build on top of it to fit their needs. It supports various robust configuration files to build networks, services, host types, offensive/defensive agents, and more.
-
-Motivations:
-* Extensibility - allowing for modifying and adding various defensive actions and offensive strategies without requiring structural changes to codebase.
-* Scalability - supporting training on large networks with minimal performance cost
-
-This environment allows for RL training and evaluations with a large set of configurable arguments to swap out networks, strategies, agents, RL parameters, and more. It also includes a visualization server using dash that allows for evaluations to be visualized in a readable graph display showing agent actions throughout the episodes.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-### Built With
-
-* [![Python][python]][python-url]
-* [![Poetry][poetry]][poetry-url]
-* [![Gym][gym]][gym-url]
-* [![W&B][wandb]][wandb-url]
-* [![Dash][plotly-dash]][plotly-dash-url]
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Getting Started
 
@@ -128,7 +51,7 @@ Once all dependencies are installed:
 
 1. If you haven't already, clone the cyberwheel repo with HTTPS
    ```sh
-   git clone https://github.com/ORNL/cyberwheel.git
+   git clone https://github.com/
    ```
    or with SSH:
    ```sh
@@ -322,57 +245,3 @@ If you are not familiar with SOLID principles, please read this before contribut
 If you need to add a dependency, this project is packaged with [poetry](https://python-poetry.org/). Please take a few minutes to read about the [basics](https://python-poetry.org/docs/basic-usage/#specifying-dependencies) before adding any dependencies. Do not use pip, do not use requirements.txt. TLDR: use `poetry add <dependency name>`. After adding your dependency, add and commit the new `poetry.lock` file.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- LICENSE -->
-## License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- CONTACT -->
-## Contacts
-
-Sean Oesch - oeschts@ornl.gov
-
-Amul Chaulagain - chaulagaina@ornl.gov
-
-Phillipe Austria - austriaps@ornl.gov
-
-Matthew Dixson - dixsonmk@ornl.gov
-
-Brian Weber - weberb@ornl.gov
-
-Cory Watson - watsoncl1@ornl.gov
-
-
-Project Link: [https://github.com/ORNL/cyberwheel/](https://github.com/ORNL/cyberwheel/)
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- Accompanying Papers -->
-## Papers
-[PLACEHOLDER]()
-
-[(2024) Towards a High Fidelity Training Environment for Autonomous Cyber Defense Agents](https://doi.org/10.1145/3675741.3675752)
-
-[(2024) The Path to Autonomous Cyber Defense](https://arxiv.org/pdf/2404.10788.pdf)
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- MARKDOWN LINKS & IMAGES -->
-[issues-shield]: https://img.shields.io/github/issues/ORNL/cyberwheel.svg?style=for-the-badge
-[issues-url]: https://github.com/ORNL/cyberwheel/issues
-[license-shield]: https://img.shields.io/github/license/ORNL/cyberwheel.svg?style=for-the-badge
-[license-url]: https://github.com/ORNL/cyberwheel/blob/release/LICENSE
-
-[plotly-dash]: https://img.shields.io/badge/plotly-dash-000000?style=for-the-badge&logo=plotly&logoColor=white
-[plotly-dash-url]: https://dash.plotly.com/
-[python]: https://img.shields.io/badge/python-000000?style=for-the-badge&logo=python&logoColor=white
-[python-url]: https://www.python.org/
-[wandb]: https://img.shields.io/badge/W&B-000000?style=for-the-badge&logo=weightsandbiases&logoColor=white
-[wandb-url]: https://wandb.ai/site
-[gym]: https://img.shields.io/badge/gym-000000?style=for-the-badge&logo=openaigym&logoColor=white
-[gym-url]: https://github.com/Farama-Foundation/Gymnasium
-[poetry]: https://img.shields.io/badge/poetry-000000?style=for-the-badge&logo=poetry&logoColor=white
-[poetry-url]: https://python-poetry.org/
