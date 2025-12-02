@@ -1,37 +1,36 @@
 action_space: RedDiscreteActionSpace
-entry_host: host1 # optional; defaults to random user
-leader: server1 # optional; defaults to random server
+entry_host: random # optional; defaults to random user
+leader: random # optional; defaults to random server
 class: RLAbstractAgent
 rl: true
-
 
 actions:
 
   LinuxLateralMovement:
     class: LinuxLateralMovement
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
   ExtraWindowMemoryInjection:
     class: ExtraWindowMemoryInjection
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   ScheduledTask:
     class: ScheduledTask
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   VNC:
     class: VNC
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
@@ -52,35 +51,35 @@ actions:
   PowerShellProfile:
     class: PowerShellProfile
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   ContainerOrchestrationJob:
     class: ContainerOrchestrationJob
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   BypassUserAccountControl:
     class: BypassUserAccountControl
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   SudoandSudoCaching:
     class: SudoandSudoCaching
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   ServicesRegistryPermissionsWeakness:
     class: ServicesRegistryPermissionsWeakness
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -94,7 +93,7 @@ actions:
   BootorLogonAutostartExecution:
     class: BootorLogonAutostartExecution
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -108,21 +107,21 @@ actions:
   ActiveSetup:
     class: ActiveSetup
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   DomainTrustModification:
     class: DomainTrustModification
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   WindowsService:
     class: WindowsService
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -136,7 +135,7 @@ actions:
   Cron:
     class: Cron
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -150,14 +149,14 @@ actions:
   PrintProcessors:
     class: PrintProcessors
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   DLLSearchOrderHijacking:
     class: DLLSearchOrderHijacking
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -199,56 +198,56 @@ actions:
   ReplicationThroughRemovableMedia:
     class: ReplicationThroughRemovableMedia
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
   ThreadExecutionHijacking:
     class: ThreadExecutionHijacking
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   ApplicationShimming:
     class: ApplicationShimming
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   PortMonitors:
     class: PortMonitors
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   LoginHook:
     class: LoginHook
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   ProcessInjection:
     class: ProcessInjection
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   EscapetoHost:
     class: EscapetoHost
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   ShortcutModification:
     class: ShortcutModification
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -262,21 +261,21 @@ actions:
   SMBWindowsAdminShares:
     class: SMBWindowsAdminShares
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
   SecuritySupportProvider:
     class: SecuritySupportProvider
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   LaunchDaemon:
     class: LaunchDaemon
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -290,14 +289,14 @@ actions:
   PathInterceptionbySearchOrderHijacking:
     class: PathInterceptionbySearchOrderHijacking
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   GroupPolicyModification:
     class: GroupPolicyModification
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -311,70 +310,70 @@ actions:
   WindowsRemoteManagement:
     class: WindowsRemoteManagement
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
   DefaultAccounts:
     class: DefaultAccounts
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   TimeProviders:
     class: TimeProviders
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   Trap:
     class: Trap
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   DynamicLinkerHijacking:
     class: DynamicLinkerHijacking
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   CreateProcesswithToken:
     class: CreateProcesswithToken
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   SetuidandSetgid:
     class: SetuidandSetgid
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   WinlogonHelperDLL:
     class: WinlogonHelperDLL
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   DistributedComponentObjectModel:
     class: DistributedComponentObjectModel
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
   ImageFileExecutionOptionsInjection:
     class: ImageFileExecutionOptionsInjection
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -388,7 +387,7 @@ actions:
   AccessibilityFeatures:
     class: AccessibilityFeatures
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -402,7 +401,7 @@ actions:
   PasstheTicket:
     class: PasstheTicket
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
@@ -416,14 +415,14 @@ actions:
   AsynchronousProcedureCall:
     class: AsynchronousProcedureCall
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   AppCertDLLs:
     class: AppCertDLLs
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -437,14 +436,14 @@ actions:
   PortableExecutableInjection:
     class: PortableExecutableInjection
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   LoginItems:
     class: LoginItems
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -458,7 +457,7 @@ actions:
   TokenImpersonationTheft:
     class: TokenImpersonationTheft
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -479,42 +478,42 @@ actions:
   WindowsManagementInstrumentationEventSubscription:
     class: WindowsManagementInstrumentationEventSubscription
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   SoftwareDeploymentTools:
     class: SoftwareDeploymentTools
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
   ParentPIDSpoofing:
     class: ParentPIDSpoofing
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   ChangeDefaultFileAssociation:
     class: ChangeDefaultFileAssociation
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   Emond:
     class: Emond
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   RegistryRunKeysStartupFolder:
     class: RegistryRunKeysStartupFolder
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -528,21 +527,21 @@ actions:
   KernelModulesandExtensions:
     class: KernelModulesandExtensions
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   SystemdTimers:
     class: SystemdTimers
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   ProcessHollowing:
     class: ProcessHollowing
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -563,21 +562,21 @@ actions:
   EventTriggeredExecution:
     class: EventTriggeredExecution
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   UnixShellConfigurationModification:
     class: UnixShellConfigurationModification
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   SIDHistoryInjection:
     class: SIDHistoryInjection
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -591,35 +590,35 @@ actions:
   AuthenticationPackage:
     class: AuthenticationPackage
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   ComponentObjectModelHijacking:
     class: ComponentObjectModelHijacking
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   LateralToolTransfer:
     class: LateralToolTransfer
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
   PathInterceptionbyUnquotedPath:
     class: PathInterceptionbyUnquotedPath
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   StartupItems:
     class: StartupItems
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -647,7 +646,7 @@ actions:
   AppInitDLLs:
     class: AppInitDLLs
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -661,14 +660,14 @@ actions:
   Screensaver:
     class: Screensaver
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   LaunchAgent:
     class: LaunchAgent
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -682,21 +681,21 @@ actions:
   RCScripts:
     class: RCScripts
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   SystemdService:
     class: SystemdService
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   RDPHijacking:
     class: RDPHijacking
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
@@ -707,19 +706,19 @@ actions:
       recurring: 0
     phase: discovery
 
-  RemoteSystemDiscovery:
-    class: RemoteSystemDiscovery
+  ARTPortScan:
+    class: ARTPortScan
     reward:
-      immediate: 20
+      immediate: 5
       recurring: 0
-    phase: discovery
+    phase: portscan
 
-  NetworkServiceDiscovery:
-    class: NetworkServiceDiscovery
+  ARTPingSweep:
+    class: ARTPingSweep
     reward:
-      immediate: 20
+      immediate: 5
       recurring: 0
-    phase: discovery
+    phase: pingsweep
 
   SoftwareDiscovery:
     class: SoftwareDiscovery
@@ -731,49 +730,49 @@ actions:
   ReopenedApplications:
     class: ReopenedApplications
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   PasstheHash:
     class: PasstheHash
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
   DLLSideLoading:
     class: DLLSideLoading
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   RemoteDesktopProtocol:
     class: RemoteDesktopProtocol
     reward:
-      immediate: 0
+      immediate: 5
       recurring: 0
     phase: lateral-movement
 
   LogonScriptWindows:
     class: LogonScriptWindows
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   LSASSDriver:
     class: LSASSDriver
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   CloudAccounts:
     class: CloudAccounts
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -787,14 +786,14 @@ actions:
   At:
     class: At
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   DynamiclinkLibraryInjection:
     class: DynamiclinkLibraryInjection
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -808,14 +807,14 @@ actions:
   NetshHelperDLL:
     class: NetshHelperDLL
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
   LocalAccounts:
     class: LocalAccounts
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
 
@@ -829,20 +828,6 @@ actions:
   COR_PROFILER:
     class: COR_PROFILER
     reward:
-      immediate: 0
+      immediate: 40
       recurring: 0
     phase: privilege-escalation
-
-  ARTPingSweep:
-    class: ARTPingSweep
-    reward:
-      immediate: 0
-      recurring: 0
-    phase: pingsweep
-  
-  ARTPortScan:
-    class: ARTPortScan
-    reward:
-      immediate: 0
-      recurring: 0
-    phase: portscan

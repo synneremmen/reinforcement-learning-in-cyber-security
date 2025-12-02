@@ -55,7 +55,7 @@ class RLAbstractAgent(ARTAgent):
         asm = importlib.import_module("cyberwheel.red_agents.action_space")
         # self.action_space = getattr(asm, as_class)(self.killchain, self.current_host.name)
 
-        self.reward_map["nothing"] = (0.0, 0.0)
+        self.reward_map["nothing"] = (0, 0)
 
         self.actions = []
         self.phase_map = {}
@@ -74,6 +74,7 @@ class RLAbstractAgent(ARTAgent):
         
         # Reinitialize action space with specific actions
         self.action_space = getattr(asm, as_class)(self.actions, self.current_host.name)
+        print(len(self.actions), "actions loaded into RLAbstractAgent action space.")
 
         self.phase_classes = {
             'discovery': ARTDiscovery,
@@ -99,10 +100,11 @@ class RLAbstractAgent(ARTAgent):
             action
         )  # Selects ART Action, should include the action and target host
         source_host = self.current_host
-        print("Red Agent selected action:", art_action.__name__, "on target host:", target_host_name)
         target_host = self.network.hosts[target_host_name] if target_host_name != "nothing" else self.current_host
         success = False
+        # print("Validating action:", art_action.__name__, "on target:", target_host_name)
         if self.validate_action(art_action, target_host_name):
+            print("Action {} valid.".format(art_action.__name__))
             if art_action == ARTPingSweep or art_action == ARTPortScan:
                 result = art_action(
                     self.current_host, target_host
@@ -111,15 +113,16 @@ class RLAbstractAgent(ARTAgent):
                 result = Nothing(self.current_host, self.current_host).sim_execute()
             else:
                 # For specific techniques
-                # print("Executing technique action:", art_action.__name__)
+                print("Executing technique ", art_action.mitre_id)
                 phase = self.phase_map[art_action.__name__]
                 phase_class = self.phase_classes.get(phase)
                 if phase_class:
                     result = phase_class(self.current_host, target_host, [art_action.mitre_id]).sim_execute()
                 else:
+                    print("Phase class not found for phase:", phase)
                     result = RedActionResults(source_host, target_host)
             success = result.attack_success
-            # print(f"Success: {success}\n\n")
+            print(f"Success: {success}\n\n")
             self.handle_action(result)
         else:
             result = RedActionResults(source_host, target_host) # will this be false by default?
@@ -185,20 +188,21 @@ class RLAbstractAgent(ARTAgent):
             return True
         phase = self.phase_map.get(action.__name__, '')
         host_view = self.observation.obs[target_host]
-        if phase == "pingsweep":  # valid if host["sweeped"] == False
+        # print("Host view:", host_view)
+        if phase == "pingsweep":  # valid if host hasn't been sweeped
             return not host_view["sweeped"]
-        elif phase == "portscan":  # valid if host["scanned"] == False and host["sweeped"] == True
+        elif phase == "portscan":  # valid if host hasn't been scanned and host has been sweeped
             return host_view["sweeped"] and not host_view["scanned"]
-        elif phase == "discovery":  # valid if host["scanned"] && host["sweeped"] && !host["discovered"]
+        elif phase == "discovery":  # valid if host has been scanned and sweeped but not discovered
             return host_view["sweeped"] and host_view["scanned"] and not host_view["discovered"]
-        elif phase == "lateral-movement":  # valid if host["scanned"] && host["sweeped"] && host["discovered"] && !host.on_target
+        elif phase == "lateral-movement":  # valid if host has been scanned and sweeped and discovered but not on target
             return (
                 host_view["sweeped"]
                 and host_view["scanned"]
                 and host_view["discovered"]
                 and not host_view["on_host"]
             )
-        elif phase == "privilege-escalation":  # valid if host["scanned"] && host["sweeped"] && host["discovered"] && host.on_target && !host["escalated"]
+        elif phase == "privilege-escalation":  # valid if host has been scanned and sweeped and discovered and on target but not escalated
             return (
                 host_view["sweeped"]
                 and host_view["scanned"]
@@ -206,7 +210,7 @@ class RLAbstractAgent(ARTAgent):
                 and host_view["on_host"]
                 and not host_view["escalated"]
             )
-        elif phase == "impact":  # valid if host["scanned"] && host["sweeped"] && host["discovered"] && host.on_target && host["escalated"]
+        elif phase == "impact":  # valid if host has been scanned and sweeped and discovered and on target and escalated
             return (
                 host_view["sweeped"]
                 and host_view["scanned"]
