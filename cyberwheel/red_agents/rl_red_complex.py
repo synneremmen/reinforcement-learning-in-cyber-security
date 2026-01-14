@@ -21,7 +21,7 @@ from cyberwheel.red_agents.red_agent_base import RedAgentResult
 from cyberwheel.reward.reward_base import RewardMap
 
 
-class RLAbstractAgent(ARTAgent):
+class RLComplexAgent(ARTAgent):
     """
     Filler
     """
@@ -73,8 +73,12 @@ class RLAbstractAgent(ARTAgent):
                 self.actions.append(cls)
         
         # Reinitialize action space with specific actions
+        with open("reward_map.txt", "w") as f:
+            data = yaml.dump(self.reward_map)
+            f.write(data)
+
         self.action_space = getattr(asm, as_class)(self.actions, self.current_host.name)
-        print(len(self.actions), "actions loaded into RLAbstractAgent action space.")
+        # print(len(self.actions), "actions loaded into RLComplexAgent action space.")
 
         self.phase_classes = {
             'discovery': ARTDiscovery,
@@ -104,7 +108,7 @@ class RLAbstractAgent(ARTAgent):
         success = False
         # print("Validating action:", art_action.__name__, "on target:", target_host_name)
         if self.validate_action(art_action, target_host_name):
-            print("Action {} valid.".format(art_action.__name__))
+            # print("\n\nAction {} valid.".format(art_action.__name__))
             if art_action == ARTPingSweep or art_action == ARTPortScan:
                 result = art_action(
                     self.current_host, target_host
@@ -113,7 +117,7 @@ class RLAbstractAgent(ARTAgent):
                 result = Nothing(self.current_host, self.current_host).sim_execute()
             else:
                 # For specific techniques
-                print("Executing technique ", art_action.mitre_id)
+                # print("Executing technique ", art_action.mitre_id)
                 phase = self.phase_map[art_action.__name__]
                 phase_class = self.phase_classes.get(phase)
                 if phase_class:
@@ -122,7 +126,7 @@ class RLAbstractAgent(ARTAgent):
                     print("Phase class not found for phase:", phase)
                     result = RedActionResults(source_host, target_host)
             success = result.attack_success
-            print(f"Success: {success}\n\n")
+            # print(f"Success: {success}\n\n")
             self.handle_action(result)
         else:
             result = RedActionResults(source_host, target_host) # will this be false by default?
