@@ -19,6 +19,7 @@ from cyberwheel.utils import RLPolicy, get_service_map
 from cyberwheel.utils.set_seed import set_seed
 from cyberwheel.runners.rl_handler import RLHandler
 from cyberwheel.network.network_base import Network
+from cyberwheel.network.network_generation.test_random_network_generator import generate_random_networks
 
 class RLTrainer:
     def __init__(self, args):
@@ -57,7 +58,6 @@ class RLTrainer:
                     #self.agents[agent]["obs"] = spaces.Space()
                 elif agent == 'red':
                     self.agents[agent] = {"max_action_space_size": env.red_agent.action_space.max_size, "max_obs_space_size": env.red_agent.observation.max_size, "max_attrs": env.max_red_attr_value}
-                    print(f"Red Agent Action Space Size: {self.agents[agent]['max_action_space_size']}")
                     self.rl_agents.append(agent)
                 elif agent == 'blue':
                     self.agents[agent] = {"max_action_space_size": env.blue_agent.action_space.max_size, "max_obs_space_size": env.blue_agent.observation.max_size, "max_attrs": env.max_blue_attr_value}
@@ -191,33 +191,6 @@ class RLTrainer:
 
         # Environment setup
 
-        # Load networks from yaml here
-        network_configs = []
-        if isinstance(self.args.network_config, str):
-            network_configs.append(self.args.network_config)
-        else:
-            for config in self.args.network_config:
-                network_configs.append(config)
-        
-        self.networks = {}
-        self.args.service_mapping = {}
-        for config in network_configs:
-            network_config = files("cyberwheel.data.configs.network").joinpath(
-                config
-            )
-
-            print(f"Building network: {config} ...")
-
-            network = Network.create_network_from_yaml(network_config)
-            print("Hosts:", network.hosts.keys())
-            network_name = network.name
-            self.networks[network_name] = [deepcopy(network) for i in range(self.args.num_envs)]
-
-            print("Mapping attack validity to hosts...", end=" ")
-            self.args.service_mapping[network_name] = get_service_map(network)
-            print("done")
-
-
         self.args.agent_config = {}
 
         for agent_type in self.args.agents:
@@ -233,6 +206,58 @@ class RLTrainer:
         
         print("Defining environment(s) and beginning training:", end="\n\n")
 
+        self.envs = self.get_envs()
+        # Create agent and optimizer
+
+        self.handler = RLHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
+
+        self.handler.define_multiagent_variables()
+
+    def get_envs(self):
+         
+        if self.args.network_config is None:
+            # Load randomly generated networks
+            self.networks = {}
+            # print("Generating random networks...")
+            network_files = generate_random_networks(n_networks=self.args.num_envs, output_path="cyberwheel/data/configs/network", seed=self.args.seed)
+            for i, net_file in enumerate(network_files):
+                network = Network.create_network_from_yaml(net_file)
+                network_name = network.name
+                if network_name not in self.networks:
+                    self.networks[network_name] = []
+                self.networks[network_name].append(deepcopy(network))
+            # print("Done.")
+         
+        else:
+            # Load networks from yaml
+            network_configs = []
+            if isinstance(self.args.network_config, str):
+                network_configs.append(self.args.network_config)
+            else:
+                for config in self.args.network_config:
+                    network_configs.append(config)
+            
+            self.networks = {}
+            for config in network_configs:
+                network_config = files("cyberwheel.data.configs.network").joinpath(
+                    config
+                )
+
+                # print(f"Building network: {config} ...")
+
+                network = Network.create_network_from_yaml(network_config)
+                # print("Hosts:", network.hosts.keys())
+                network_name = network.name
+                self.networks[network_name] = [deepcopy(network) for i in range(self.args.num_envs)]
+
+        # Map services for attack validity
+        self.args.service_mapping = {}
+        for network_name, network_list in self.networks.items():
+            network = network_list[0]
+            # print("Mapping attack validity to hosts...", end=" ")
+            self.args.service_mapping[network_name] = get_service_map(network)
+        # print("done")
+    
         env_funcs = [self.make_env(i) for i in range(self.args.num_envs)]
 
         self.envs = (
@@ -245,11 +270,8 @@ class RLTrainer:
             self.envs.single_action_space, gym.spaces.Dict
         ), "only discrete action space is supported"
 
-        # Create agent and optimizer
+        return self.envs
 
-        self.handler = RLHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
-
-        self.handler.define_multiagent_variables()
 
     def train(self, update):
         # Tracking runtimes and processing times

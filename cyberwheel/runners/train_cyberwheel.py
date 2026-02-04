@@ -23,7 +23,6 @@ def train_cyberwheel(args: YAMLConfig):
     args.save_frequency = int(args.num_updates / args.num_saves)    # Number of policy updates between each model save and evaluation
     if args.save_frequency == 0:
         args.save_frequency = 1
-    args.num_updates = args.total_timesteps // args.batch_size
 
     # Unique experiment name if empty
     if not args.experiment_name:
@@ -42,6 +41,11 @@ def train_cyberwheel(args: YAMLConfig):
     trainer.configure_training()
 
     for update in range(1, args.num_updates + 1):
+        print(f"----- Update {update} -----")
+        # update envs each training step if leader and entry host are random (initial method to test)
+        red_agent = trainer.handler.envs.envs[0].red_agent
+        if red_agent.leader == "random" and red_agent.entry_host == "random":
+            trainer.handler.envs = trainer.get_envs()  # reinitialize envs (entry host and leader will be reselected)
         trainer.train(update)
 
     trainer.close()
