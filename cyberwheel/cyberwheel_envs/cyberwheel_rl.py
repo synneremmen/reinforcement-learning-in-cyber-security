@@ -59,8 +59,8 @@ class CyberwheelRL(gym.Env, Cyberwheel):
     
     def initialize_agents(self) -> None:
         max_net = self.args.network_size_compatibility
-        self.args.max_num_hosts = 100 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
-        self.args.max_num_subnets = 10 if max_net == 'small' else 100 if max_net == 'medium' else 1000 #if max_net == 'large'
+        self.args.max_num_hosts = 5 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
+        self.args.max_num_subnets = 2 if max_net == 'small' else 100 if max_net == 'medium' else 1000 #if max_net == 'large'
 
         self.blue_agent = getattr(blue_agents, self.args.agent_config["blue"]["class"])(network=self.network, args=self.args)
         self.red_agent = getattr(red_agents, self.args.agent_config["red"]["class"])(network=self.network, args=self.args)
@@ -141,6 +141,7 @@ class CyberwheelRL(gym.Env, Cyberwheel):
                 "killchain": self.red_agent.killchain,
                 "network": self.network,
                 "history": self.red_agent.history,
+                "host_info": getattr(self.red_agent, "observation", None).obs if hasattr(self.red_agent, "observation") else None,
                 "commands": [], #red_agent_result.action_results.metadata.get("commands", []),
                 "decoy_attacked": decoy_attacked,
                 "red_reward": red_reward,

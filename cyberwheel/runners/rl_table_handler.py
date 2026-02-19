@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import os
 
-class RLHandler:
+class RLTableHandler:
 
     def __init__(self, envs: VectorEnv, args, agents: dict, static_agents=[]):
         self.envs = envs
@@ -18,30 +18,15 @@ class RLHandler:
         self.device = self.args.device
         print(f"Using device '{self.device}'")
 
-        #self.agents = agents.keys()
-        #print(agents)
         self.agents = {}
         self.static_agents = static_agents
-        if self.args.policy_type not in ["actor_critic", "table_based"]:
-            raise ValueError(f"Invalid policy type '{self.args.policy_type}'. Must be either 'actor_critic' or 'table_based'.")
+        if self.args.policy_type != "table_based":
+            raise ValueError(f"Invalid policy type '{self.args.policy_type}'. Must be 'table_based'.")
 
         for agent in agents:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
-            print("Action space size", self.agents[agent]["max_action_space_size"])
-            print("Observation space shape", self.agents[agent]["shape"])
-            if self.args.policy_type == "table_based":
-                self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"]).to(self.device)
-            else:
-                self.agents[agent]["policy"] = RLPolicyActorCritic(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"]).to(self.device)
-                self.agents[agent]["optimizer"] = optim.Adam([
-                    { 'params': list(self.agents[agent]["policy"].actor.parameters()),  'lr': float(self.args.actor_lr),  'eps': 1e-5 },
-                    { 'params': list(self.agents[agent]["policy"].critic.parameters()), 'lr': float(self.args.critic_lr), 'eps': 1e-5 },
-                ])
-                if self.args.anneal_lr == 'cosine_restarts':
-                    self.agents[agent]["scheduler"] = optim.lr_scheduler.CosineAnnealingWarmRestarts(self.agents[agent]["optimizer"], T_0=int(self.args.save_frequency), T_mult=int(self.args.restart_Tmult), eta_min=float(self.args.min_lr), last_epoch=-1) if self.args.anneal_lr == 'cosine_restarts' else None
-            # TODO: Reconfigure LR
-
+            self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"]).to(self.device)
 
     def define_multiagent_variables(self):
         reset = self.envs.reset(seed=[i for i in range(self.args.num_envs)])[0]
@@ -50,7 +35,6 @@ class RLHandler:
             agent_dict = self.agents[agent]
             self.agents[agent]["obs"] = torch.zeros((self.args.num_steps, self.args.num_envs) + agent_dict["obs"].shape).to(self.device)
             self.agents[agent]["actions"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
-            self.agents[agent]["logprobs"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
             self.agents[agent]["values"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
             self.agents[agent]["action_masks"] = torch.zeros((self.args.num_steps, self.args.num_envs, agent_dict["max_action_space_size"]), dtype=torch.bool).to(self.device)
             self.agents[agent]["resets"] = np.array(reset[agent]) # TODO: Need to update with determinism
@@ -83,11 +67,9 @@ class RLHandler:
 
         for agent in self.agents:
             self.agents[agent]["obs"][step] = self.agents[agent]["next_obs"]
-            with torch.no_grad():
-                action, logprob, _, value = self.agents[agent]["policy"].get_action_and_value(self.agents[agent]["next_obs"], action_mask=self.agents[agent]["action_masks"][step])
-                self.agents[agent]["values"][step] = value.flatten()
-                self.agents[agent]["actions"][step] = action
-                self.agents[agent]["logprobs"][step] = logprob
+            action, value = self.agents[agent]["policy"].get_action_and_value(self.agents[agent]["next_obs"], action_mask=self.agents[agent]["action_masks"][step])
+            self.agents[agent]["values"][step] = value.flatten()
+            self.agents[agent]["actions"][step] = action
             action = action.cpu().numpy()
 
             # Execute the selected action in the environment to collect experience for training.
@@ -168,7 +150,7 @@ class RLHandler:
     
     def calculate_loss(self, mb_inds):
         for agent in self.agents:
-
+            
             # Value loss
             newvalue = self.agents[agent]["newvalue"].view(-1)
             # Calculate the MSE loss between the returns and the value predictions of the critic

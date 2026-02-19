@@ -12,8 +12,8 @@ class RandomNetworkGenerator:
     
     def generate_random_network(
         self, 
-        num_subnets=(2, 5),
-        hosts_per_subnet=(3, 8),
+        num_subnets=(3, 9),
+        hosts_per_subnet=(3, 11),
         host_types=None,
         network_name=None
     ):
@@ -31,7 +31,8 @@ class RandomNetworkGenerator:
         """
         
         if host_types is None:
-            host_types = ["workstation", "web_server"] # remove database_server since it is not defined in host definitions?
+            # host_types = ["workstation", "web_server"] # remove database_server since it is not defined in host definitions?
+            host_types = ["mail_server", "file_server", "web_server", "ssh_jump_server", "proxy_server", "workstation"]
         
         # Generate network name if not provided
         if network_name is None:
@@ -85,11 +86,18 @@ class RandomNetworkGenerator:
         host_id = 0
         for subnet_name in subnet_names:
             n_hosts = self.rng.randint(*hosts_per_subnet)
-            
+            # if len(host_id) + n_hosts > max_num_hosts: # if exceeding max num hosts, adjust n_hosts to fit remaining capacity
+            #     n_hosts = max_num_hosts - len(host_id)
             for j in range(n_hosts):
                 host_name = f"host_{host_id:03d}" # format: pad with leading zeros to ensure 3 digits
-                host_type = self.rng.choice(host_types) # add probabilities?
+                # host_type = self.rng.choice(host_types) # add probabilities?
+                host_type = self.rng.choices(host_types, weights=[0.15, 0.15, 0.15, 0.15, 0.08, 0.5], k=1)[0]
+                # higher chance of workstation (user hosts), lower chance of proxy_server
                 
+                if j == n_hosts - 1:
+                    if "workstation" not in [host["type"] for host in network.data["hosts"].values()] and host_type != "workstation":
+                        host_type = "workstation" # ensure at least one workstation exists in the network
+
                 network.host(
                     host_name,
                     subnet=subnet_name,
@@ -112,7 +120,7 @@ class RandomNetworkGenerator:
         # Optionally add some random interfaces between hosts (lateral movement paths)
         all_hosts = [f"host_{i:03d}" for i in range(host_id)]
         n_connections = self.rng.randint(1, min(5, len(all_hosts) // 2))
-        
+
         for _ in range(n_connections):
             if len(all_hosts) >= 2:
                 host1, host2 = self.rng.sample(all_hosts, 2)
@@ -137,7 +145,7 @@ class RandomNetworkGenerator:
         return f"{output_path}/{network.file_name}.yaml"
 
 
-def generate_random_networks(n_networks=10, output_path="cyberwheel/data/configs/network", seed=None):
+def generate_random_networks(n_networks=10, output_path="cyberwheel/data/configs/network", seed=None, t=""):
     """
     Generate multiple random network configurations.
     
@@ -153,9 +161,13 @@ def generate_random_networks(n_networks=10, output_path="cyberwheel/data/configs
     files = []
     
     for i in range(n_networks):
-        # Vary the parameters for diversity
-        num_subnets = (2, random.randint(3, 6))
-        hosts_per_subnet = (3, random.randint(5, 12))
+        if t == "table": # not exceed 6 hosts for table-based policy due to combinatorial explosion of state space
+            num_subnets = (1, 2)
+            hosts_per_subnet = (2, 2)
+        else:
+            num_subnets = (2, random.randint(3, 6))
+            hosts_per_subnet = (3, random.randint(5, 12))
+        print(f"Generating network {i+1}/{n_networks} with num_subnets={num_subnets} and hosts_per_subnet={hosts_per_subnet}")
         
         file_path = generator.generate_and_save(
             output_path=output_path,

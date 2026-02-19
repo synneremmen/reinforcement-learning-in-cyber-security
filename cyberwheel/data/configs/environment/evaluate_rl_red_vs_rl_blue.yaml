@@ -1,28 +1,27 @@
 # Evaluation Parameters
 agents:
   # red: art_agent.yaml
-  red: rl_red_agent.yaml
+  red: rl_red_complex.yaml # rl_red_agent.yaml
   # blue: rl_blue_agent.yaml
   blue: inactive_blue_agent.yaml # only logs the agent with "rl" in its name
-  # red: rl_red_agent.yaml
 environment: CyberwheelRL
-valid_targets: leader
+valid_targets: servers
 max_decoys: 5
-network_size_compatibility: small
+network_size_compatibility: medium # small
 campaign: false
 seed: 1
 deterministic: false
 
-checkpoint: agent # agent
+checkpoint: 12100 # agent
 download_model: false
 run: # required if download_model is true
 wandb_project_name: # required if download_model is true
 wandb_entity: # required if download_model is true
 
-experiment_name: RLRedAgentvsRLBlueAgent
+experiment_name: ComplexRLRedAgentvsRLBlueAgent # RLRedAgentvsRLBlueAgent
 visualize: true
-graph_name: RLRedAgentvsRLBlueAgent
-network_config: 15-host-network.yaml
+graph_name: ComplexRLRedAgentvsRLBlueAgent # RLRedAgentvsRLBlueAgent
+network_config: random-network-000.yaml
 decoy_config: decoy_hosts.yaml
 host_config: host_defs_services.yaml
 detector_config: perfect_detector.yaml

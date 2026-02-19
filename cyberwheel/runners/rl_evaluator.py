@@ -13,7 +13,8 @@ from importlib.resources import files
 from tqdm import tqdm
 
 from cyberwheel.network.network_base import Network
-from cyberwheel.utils import RLPolicy, get_service_map
+from cyberwheel.utils import RLPolicyActorCritic
+from cyberwheel.utils.get_service_map import get_service_map
 from cyberwheel.runners.visualizer import Visualizer
 from cyberwheel.runners.rl_trainer import RLTrainer
 from cyberwheel.utils.set_seed import set_seed
@@ -82,7 +83,7 @@ class RLEvaluator(RLTrainer):
 
     def load_models(self):
         for agent in self.agents:
-            self.policy[agent] = RLPolicy(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape).to(self.device)
+            self.policy[agent] = RLPolicyActorCritic(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape).to(self.device)
             agent_filename = f"{agent}_{self.args.checkpoint}.pt"
 
             # If download from W&B, use API to get run data.
@@ -183,6 +184,14 @@ class RLEvaluator(RLTrainer):
 
                 actions_df = pd.DataFrame(actions_df)
                 actions_df.to_csv(self.log_file, mode='a', header = os.path.getsize(self.log_file) == 0, index=False)
+                # save graph
+                if self.args.visualize:
+                    self.visualizer = Visualizer(
+                        network=list(self.networks.values())[0][0],
+                        experiment_name=self.args.experiment_name,
+                    )
+                    self.visualizer.visualize(episode, step, info)
+                    # visualize(net, episode, step, now_str, history, killchain)
                 #return # TODO
 
 """

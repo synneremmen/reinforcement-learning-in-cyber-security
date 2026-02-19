@@ -9,6 +9,11 @@ from typing import Any
 from importlib.resources import files
 from cyberwheel.observation import RedObservation
 
+# def _get_host_view(host_view, name: str) -> bool:
+#         if isinstance(host_view, dict): 
+#             return bool(host_view.get(name, False)) 
+#         return bool(getattr(host_view, name, False)) 
+
 def color_map(host_view) -> str:
         """
         Maps the state of the Host with a corresponding color.
@@ -41,7 +46,6 @@ class Visualizer:
         for h in list(network.graph.nodes):
             self.host_mapping[h] = {"color": "gray"}
         self.draw_graph(network.graph)
-
 
         #node_color = []
         #node_edgecolor = []
@@ -87,11 +91,11 @@ class Visualizer:
         #print(len(self.pos.keys()))
 
         # Create `graphs/experiment_name` directory if it doesn't exist
-        host_info = info["host_info"]
+        host_info = info.get("host_info") or info["history"].hosts
         network: Network = info["network"]
 
-        source_host = info["source_host"]
-        target_host = info["target_host"]
+        source_host = info["red_action_src"]
+        target_host = info["red_action_dst"]
         step_commands = info["commands"]
 
         # Initialize network graph and environment state information
@@ -107,7 +111,7 @@ class Visualizer:
         on_host = ""
         for h, host_view in host_info.items():
             color = color_map(host_view)
-            on_host = h if host_view.on_host else source_host
+            on_host = h if host_view["on_host"] else source_host # _get_host_view(host_view, "on_host")
             if h not in self.host_mapping:
                 self.host_mapping[h] = {"color": "blue"}
             elif color != self.host_mapping[h]["color"]:

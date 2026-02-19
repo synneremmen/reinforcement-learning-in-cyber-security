@@ -1,11 +1,11 @@
 # Training Parameters
-experiment_name: RLRedAgentvsRLBlueAgent #TrainRedAgent_TwoLRs_AnnealonUpdate_BothHigh_ActionMask #EmulatorIntegrationCampaign_FixedTypeObs
+experiment_name: ComplexRLRedAgentvsRLBlueAgent #TrainRedAgent_TwoLRs_AnnealonUpdate_BothHigh_ActionMask #EmulatorIntegrationCampaign_FixedTypeObs
 seed: 1 # The seed to use for the experiment
 deterministic: false # Whether or not the training is deterministic
 device: cpu # Which device to train on
 async_env: false # Whether to run the environments in parallel
-total_timesteps: 100 # Total number of steps to run throughout training
-num_saves: 100 # Number of times the model is evaluated and saved during the training run
+total_timesteps: 1000000 # Total number of steps to run throughout training
+num_saves: 1000 # Number of times the model is evaluated and saved during the training run
 num_envs: 1 # Number of game environments to run at once (parallel if async_env == true)
 num_steps: 100 # Number of steps to run per episode
 eval_episodes: 5 # Number of episodes to run in an evaluation
@@ -13,9 +13,9 @@ debug_mode: false
 
 # Environment Parameters
 environment: CyberwheelRL # Environment class to use
-network_config: # List of network configuration filenames in config/network
-  - 10-host-network.yaml 
-  - 15-host-network.yaml 
+network_config: # List of network configuration filenames in config/network, if none: generate randomly
+#   - 10-host-network.yaml 
+#  - 15-host-network.yaml 
   # - 25-host-network.yaml
   # - 50-host-network.yaml
 host_config: host_defs_services.yaml # Host configuration filename in config/host_definitions
@@ -25,8 +25,9 @@ agents:
   blue: inactive_blue_agent.yaml
   # blue: rl_blue_agent.yaml
   # red: rl_red_campaign.yaml
-  red: rl_red_agent.yaml
-  # red: rl_red_complex.yaml
+  # red: rl_red_agent.yaml
+  red: rl_red_complex.yaml
+policy_type: table_based
 
 valid_targets: servers
 reward_function: RLReward # The reward function
@@ -38,7 +39,7 @@ max_decoys: 5
 
 # RL Parameters
 env_id: cyberwheel # Environment ID
-#learning_rate: 2.5e-4 # Learning rate value of the optimizer
+learning_rate: 2.5e-4 # Learning rate value of the optimizer
 actor_lr: 2.5e-4
 critic_lr: 2.5e-4
 anneal_lr: cosine_restarts # Whether or not to anneal the learning rate for policy and value networks

@@ -15,9 +15,11 @@ from torch import optim, nn
 from importlib.resources import files
 from statistics import mean, median
 
-from cyberwheel.utils import RLPolicy, get_service_map
+from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTableBased
+from cyberwheel.utils.get_service_map import get_service_map
 from cyberwheel.utils.set_seed import set_seed
 from cyberwheel.runners.rl_handler import RLHandler
+from cyberwheel.runners.rl_table_handler import RLTableHandler
 from cyberwheel.network.network_base import Network
 from cyberwheel.network.network_generation.test_random_network_generator import generate_random_networks
 
@@ -144,7 +146,7 @@ class RLTrainer:
                 eval_agent = None
                 # Load the agent
 
-                eval_agent = RLPolicy(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"]).to(eval_device)
+                eval_agent = RLPolicyActorCritic(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"]).to(eval_device)
                 eval_agent.load_state_dict(loaded_models[agent])
                 eval_agent.eval()
                 eval_agents[agent] = eval_agent
@@ -209,17 +211,21 @@ class RLTrainer:
         self.envs = self.get_envs()
         # Create agent and optimizer
 
-        self.handler = RLHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
+        # self.handler = RLHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
+        self.handler = RLTableHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
 
         self.handler.define_multiagent_variables()
 
     def get_envs(self):
-         
         if self.args.network_config is None:
             # Load randomly generated networks
             self.networks = {}
             # print("Generating random networks...")
-            network_files = generate_random_networks(n_networks=self.args.num_envs, output_path="cyberwheel/data/configs/network", seed=self.args.seed)
+            if self.args.policy_type == "table_based":
+                t = "table"
+            else: 
+                t = ""
+            network_files = generate_random_networks(n_networks=self.args.num_envs, output_path="cyberwheel/data/configs/network", seed=self.args.seed, t=t)
             for i, net_file in enumerate(network_files):
                 network = Network.create_network_from_yaml(net_file)
                 network_name = network.name
@@ -257,7 +263,7 @@ class RLTrainer:
             # print("Mapping attack validity to hosts...", end=" ")
             self.args.service_mapping[network_name] = get_service_map(network)
         # print("done")
-    
+
         env_funcs = [self.make_env(i) for i in range(self.args.num_envs)]
 
         self.envs = (

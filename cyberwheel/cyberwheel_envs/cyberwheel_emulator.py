@@ -61,7 +61,7 @@ class CyberwheelEmulator(CyberwheelRL):
 
     def initialize_agents(self):
         max_net = self.args.network_size_compatibility
-        self.args.max_num_hosts = 100 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
+        self.args.max_num_hosts = 5 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
 
         self.blue_agent = RLBlueAgent(self.network, self.args)
         self.red_agent = EmulatorRLRedCampaign(self.network, self.args)

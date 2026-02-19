@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 from cyberwheel.cyberwheel_envs.cyberwheel import Cyberwheel
 from cyberwheel.network.network_base import Network
-from cyberwheel.utils import get_service_map
+from cyberwheel.utils.get_service_map import get_service_map
 
 
 class BaselineRunner:
