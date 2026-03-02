@@ -115,6 +115,7 @@ class RLARTAgent(ARTAgent):
         src_host = result.src_host.name
         target_host = result.target_host.name
         if action == ARTPingSweep:  # Adds pingsweeped hosts to obs
+            # print(f"Updated host {target_host} to sweeped in observation")
             self.observation.update_host(target_host, sweeped=True)
             hosts = result.metadata[result.target_host.subnet.name]["sweeped_hosts"]
             for h in hosts:
@@ -125,16 +126,22 @@ class RLARTAgent(ARTAgent):
                 self.observation.add_host(h_name, sweeped=sweeped)
                 self.action_space.add_host(h_name)
         elif action == ARTPortScan:  # Scans target host
+            # print(f"Updated host {target_host} to scanned in observation")
             self.observation.update_host(target_host, scanned=True)
         elif action == ARTDiscovery:  # Discovers host type
+            print(f"Updated host {target_host} to discovered in observation")
             self.observation.update_host(target_host, discovered=True, type=result.target_host.host_type.type)
         elif action == ARTLateralMovement:  # Moves to target host
+            # print(f"Updated host {target_host} to on_host in observation")
             self.observation.update_host(target_host, on_host=True)
             self.observation.update_host(src_host, on_host=False)
+            self.observation.update_host(target_host, visited=True)
             self.current_host = result.target_host
         elif action == ARTPrivilegeEscalation:
+            # print(f"Updated host {target_host} to escalated in observation")
             self.observation.update_host(target_host, escalated=True)
         elif action == ARTImpact:
+            print(f"Updated host {target_host} to impacted in observation")
             self.observation.update_host(target_host, impacted=True)
 
     def handle_network_change(self):
@@ -145,6 +152,8 @@ class RLARTAgent(ARTAgent):
             self.service_mapping[h] = self.get_valid_techniques_by_host(
                 host, self.all_kcps
             )
+            print(f"New host detected: {h}. Added to service mapping and observation.")
+            print(f"Valid techniques for host {h}: {[tech.get_name() for tech in self.service_mapping[h]]}")
             self.observation.add_host(h, sweeped=True)
             self.action_space.add_host(h)
         self.tracked_hosts = current_hosts

@@ -1,4 +1,6 @@
 
+from collections import defaultdict
+from cyberwheel.utils.rl_policy import RLPolicyTableBased
 import gymnasium as gym
 import time
 import importlib
@@ -83,24 +85,36 @@ class RLEvaluator(RLTrainer):
 
     def load_models(self):
         for agent in self.agents:
-            self.policy[agent] = RLPolicyActorCritic(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape).to(self.device)
             agent_filename = f"{agent}_{self.args.checkpoint}.pt"
-
             # If download from W&B, use API to get run data.
             if self.args.download_model:
                 model = self.run.file(agent_filename)
                 model.download(
                     files("cyberwheel.data.models").joinpath(self.args.experiment_name), exist_ok=True
                 )
-
-            # Load model from models/ directory
-            self.policy[agent].load_state_dict(
-                torch.load(
-                    files(f"cyberwheel.data.models.{self.args.experiment_name}").joinpath(agent_filename),
-                    map_location=self.device,
+            
+            if "table" in self.args.experiment_name.lower():
+                self.policy[agent] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape).to(self.device)
+                save_dict = torch.load(
+                                files(f"cyberwheel.data.models.{self.args.experiment_name}").joinpath(agent_filename),
+                                map_location=self.device,
+                            )
+                # Restore Q-table
+                q_table_dict = save_dict['q_table']
+                self.policy[agent].q_table = defaultdict(
+                    lambda: torch.zeros(self.agents[agent]["policy"].action_space_shape)
                 )
-            )
-            self.policy[agent].eval()
+                self.policy[agent].q_table.update(q_table_dict)
+                
+            else:
+                self.policy[agent] = RLPolicyActorCritic(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape).to(self.device)            
+                self.policy[agent].load_state_dict(
+                    torch.load(
+                        files(f"cyberwheel.data.models.{self.args.experiment_name}").joinpath(agent_filename),
+                        map_location=self.device,
+                    )
+                )
+                self.policy[agent].eval()
 
     def _initialize_environment(self):
         print("Resetting the environment...")

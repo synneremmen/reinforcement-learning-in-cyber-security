@@ -146,9 +146,13 @@ class RLTrainer:
                 eval_agent = None
                 # Load the agent
 
-                eval_agent = RLPolicyActorCritic(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"]).to(eval_device)
-                eval_agent.load_state_dict(loaded_models[agent])
-                eval_agent.eval()
+                if isinstance(self.handler, RLTableHandler):
+                    eval_agent = RLPolicyTableBased(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"]).to(eval_device)
+                    eval_agent.q_table = loaded_models[agent]
+                else:
+                    eval_agent = RLPolicyActorCritic(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"]).to(eval_device)
+                    eval_agent.load_state_dict(loaded_models[agent])
+                    eval_agent.eval()
                 eval_agents[agent] = eval_agent
 
             # Evaluate the agent
@@ -211,8 +215,10 @@ class RLTrainer:
         self.envs = self.get_envs()
         # Create agent and optimizer
 
-        # self.handler = RLHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
-        self.handler = RLTableHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
+        if self.args.policy_type == "table_based":
+            self.handler = RLTableHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
+        else:
+            self.handler = RLHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
 
         self.handler.define_multiagent_variables()
 
@@ -225,7 +231,7 @@ class RLTrainer:
                 t = "table"
             else: 
                 t = ""
-            network_files = generate_random_networks(n_networks=self.args.num_envs, output_path="cyberwheel/data/configs/network", seed=self.args.seed, t=t)
+            network_files = generate_random_networks(n_networks=self.args.num_envs, output_path="cyberwheel/data/configs/network", seed=self.args.seed if self.args.deterministic else None, t=t)
             for i, net_file in enumerate(network_files):
                 network = Network.create_network_from_yaml(net_file)
                 network_name = network.name
@@ -312,7 +318,8 @@ class RLTrainer:
         self.handler.log_stuff(self.writer, episode_time, episode_process_time)
         
         # Calculate advantages used to optimize the policy and returns which are compared to values to optimize the critic.
-        self.handler.compute_gae()
+        if isinstance(self.handler, RLPolicyActorCritic):
+            self.handler.compute_gae()
 
         # Flatten the batch
         self.handler.flatten_batch()
@@ -330,8 +337,9 @@ class RLTrainer:
                 mb_inds = b_inds[start:end]
 
                 self.handler.update_policy(mb_inds)
-                self.handler.calculate_loss(mb_inds)
-                self.handler.backpropagate(update)
+                if isinstance(self.handler, RLPolicyActorCritic):
+                    self.handler.calculate_loss(mb_inds)
+                    self.handler.backpropagate(update)
 
             if self.args.target_kl is not None:
                 if self.handler.approx_kl > self.args.target_kl:

@@ -1,6 +1,7 @@
+from collections import defaultdict
 from torch import nn, optim
 
-from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTableBased
+from cyberwheel.utils import RLPolicyTableBased
 from gymnasium.vector import VectorEnv, AsyncVectorEnv
 
 from importlib.resources import files
@@ -11,40 +12,46 @@ import os
 
 class RLTableHandler:
 
-    def __init__(self, envs: VectorEnv, args, agents: dict, static_agents=[]):
+    def __init__(self, envs: VectorEnv, args, agents: dict, static_agents=[], load=False):
         self.envs = envs
         self.args = args
-        # Use a GPU if available. You can choose a specific GPU with CUDA, for example by setting 'device' to "cuda:0"
         self.device = self.args.device
         print(f"Using device '{self.device}'")
 
         self.agents = {}
         self.static_agents = static_agents
-        if self.args.policy_type != "table_based":
-            raise ValueError(f"Invalid policy type '{self.args.policy_type}'. Must be 'table_based'.")
-
+        self.episode = 1
+        
         for agent in agents:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
             self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"]).to(self.device)
 
+        if load:
+            self.load_models(files("cyberwheel.data.models").joinpath(self.args.experiment_name))
+
     def define_multiagent_variables(self):
+        """Initialize episode tracking variables"""
         reset = self.envs.reset(seed=[i for i in range(self.args.num_envs)])[0]
 
         for agent in self.agents:
             agent_dict = self.agents[agent]
             self.agents[agent]["obs"] = torch.zeros((self.args.num_steps, self.args.num_envs) + agent_dict["obs"].shape).to(self.device)
             self.agents[agent]["actions"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
-            self.agents[agent]["values"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
             self.agents[agent]["action_masks"] = torch.zeros((self.args.num_steps, self.args.num_envs, agent_dict["max_action_space_size"]), dtype=torch.bool).to(self.device)
-            self.agents[agent]["resets"] = np.array(reset[agent]) # TODO: Need to update with determinism
+            self.agents[agent]["resets"] = np.array(reset[agent])
             self.agents[agent]["next_obs"] = torch.Tensor(self.agents[agent]["resets"]).to(self.device)
             self.agents[agent]["rewards"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
+            self.agents[agent]["episode_rewards"] = torch.zeros(self.args.num_envs).to(self.device)
+            self.agents[agent]["episode_lengths"] = torch.zeros(self.args.num_envs).to(self.device)
+            self.agents[agent]["dones"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
+            self.agents[agent]["values"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
         self.dones = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
         self.next_done = torch.zeros(self.args.num_envs).to(self.device)
         self.global_step = 0
 
     def mask_actions(self, new_action_mask, action_mask):
+        """Convert action mask to tensor"""
         new_mask = torch.tensor(
             new_action_mask,
             dtype=torch.bool,
@@ -53,166 +60,98 @@ class RLTableHandler:
         return new_mask
     
     def update_action_masks(self, step: int):
+        """Get current action masks from all environments"""
         masks = self.envs.call("action_mask") if self.args.async_env else [env.unwrapped.action_mask for env in self.envs.envs]
         for agent in self.agents:
             for i in range(self.args.num_envs):
-                #print(agent, step, i, masks[i][agent])
                 self.agents[agent]["action_masks"][step][i] = self.mask_actions(masks[i][agent], self.agents[agent]["action_masks"][step][i])
 
 
     def step_multiagent(self, step: int):
+        """Execute one step in all environments"""
         self.global_step += self.args.num_envs
         self.dones[step] = self.next_done
         policy_action = {}
 
         for agent in self.agents:
             self.agents[agent]["obs"][step] = self.agents[agent]["next_obs"]
-            action, value = self.agents[agent]["policy"].get_action_and_value(self.agents[agent]["next_obs"], action_mask=self.agents[agent]["action_masks"][step])
-            self.agents[agent]["values"][step] = value.flatten()
-            self.agents[agent]["actions"][step] = action
-            action = action.cpu().numpy()
-
-            # Execute the selected action in the environment to collect experience for training.
-            policy_action[agent] = action
-        #print(policy_action)
+            for env_idx in range(self.args.num_envs):
+                obs = self.agents[agent]["obs"][step][env_idx].cpu().numpy()
+                action_mask = self.agents[agent]["action_masks"][step][env_idx]
+                # self.agents[agent]["values"][step][env_idx] = self.agents[agent]["policy"].get_value(obs, action_mask=action_mask).detach()
+                action = self.agents[agent]["policy"].select_action(
+                    obs, action_mask
+                )
+                # value = self.agents[agent]["policy"].get_value(obs, action=action)
+                # self.agents[agent]["values"][step][env_idx] = value
+                self.agents[agent]["actions"][step][env_idx] = action
+            
+            policy_action[agent] = self.agents[agent]["actions"][step].cpu().numpy()
+            # self.[step] = self.next_done 
 
         obs, reward, done, _, info = self.envs.step(policy_action)
 
         for agent in self.agents:
-            self.agents[agent]["next_obs"] = torch.Tensor(obs[agent]).to(self.device)
-            if f"{agent}_reward" in info:
-                self.agents[agent]["rewards"][step] = torch.tensor(info[f"{agent}_reward"]).to(self.device).view(-1)
+            for env_idx in range(self.args.num_envs):
+                reward_val = self.agents[agent]["rewards"][step][env_idx].item()
+                self.agents[agent]["episode_rewards"][env_idx] += reward_val
+                self.agents[agent]["episode_lengths"][env_idx] += 1
+                self.agents[agent]["next_obs"][env_idx] = torch.Tensor(obs[agent][env_idx]).to(self.device)
+                if f"{agent}_reward" in info:
+                    self.agents[agent]["rewards"][step][env_idx] = torch.tensor(info[f"{agent}_reward"][env_idx]).to(self.device)
 
         self.next_done = torch.Tensor(done).to(self.device)
-    
+
     def log_stuff(self, writer, episodic_runtime, episodic_processing_time):
+        """Log training metrics"""
         output_str = f"global_step={self.global_step}"
+        
         for agent in self.agents:
             mean_rew = self.agents[agent]["rewards"].sum(axis=0).mean()
             output_str += f", {agent}_episodic_return={mean_rew}"
             writer.add_scalar(f"charts/{agent}_episodic_return", mean_rew, self.global_step)
+                
+            q_table = self.agents[agent]["policy"].q_table
+            num_states = len(q_table)
+            if num_states > 0:
+                all_q_values = torch.stack([v for v in q_table.values()])
+                mean_q = all_q_values.mean().item()
+                max_q = all_q_values.max().item()
+                writer.add_scalar(f"charts/{agent}_mean_q_value", mean_q, self.global_step)
+                writer.add_scalar(f"charts/{agent}_max_q_value", max_q, self.global_step)
+                writer.add_scalar(f"charts/{agent}_num_states_visited", num_states, self.global_step)
+                
         print(output_str)
         writer.add_scalar(f"charts/episodic_runtime", episodic_runtime, self.global_step)
         writer.add_scalar(f"charts/episodic_process_time", episodic_processing_time, self.global_step)
 
-    def compute_gae(self):
-        for agent in self.agents:
-            with torch.no_grad():
-                next_value = self.agents[agent]["policy"].get_value(self.agents[agent]["next_obs"]).reshape(1, -1)
-                self.agents[agent]["advantages"] = torch.zeros_like(self.agents[agent]["rewards"]).to(self.device)
-                lastgaelam = 0
-                for t in reversed(range(self.args.num_steps)):
-                    if t == self.args.num_steps - 1:
-                        nextnonterminal = 1.0 - self.next_done
-                        nextvalues = next_value
-                    else:
-                        nextnonterminal = 1.0 - self.dones[t + 1]
-                        nextvalues = self.agents[agent]["values"][t + 1]
-                    #print(t, self.agents[agent]["rewards"], self.agents[agent]["values"])
-                    delta = self.agents[agent]["rewards"][t] + self.args.gamma * nextvalues * nextnonterminal - self.agents[agent]["values"][t]
-                    self.agents[agent]["advantages"][t] = lastgaelam = delta + self.args.gamma * self.args.gae_lambda * nextnonterminal * lastgaelam
-                self.agents[agent]["returns"] = self.agents[agent]["advantages"] + self.agents[agent]["values"]
-
     def flatten_batch(self):
-        for agent in self.agents:
-            self.agents[agent]["batched"] = {}
-            self.agents[agent]["batched"]["obs"] = self.agents[agent]["obs"].reshape((-1,) + self.agents[agent]["shape"])
-            self.agents[agent]["batched"]["logprobs"] = self.agents[agent]["logprobs"].reshape(-1)
-            self.agents[agent]["batched"]["actions"] = self.agents[agent]["actions"].reshape(-1)
-            self.agents[agent]["batched"]["advantages"] = self.agents[agent]["advantages"].reshape(-1)
-            self.agents[agent]["batched"]["returns"] = self.agents[agent]["returns"].reshape(-1)
-            self.agents[agent]["batched"]["values"] = self.agents[agent]["values"].reshape(-1)
-            self.agents[agent]["batched"]["action_masks"] = self.agents[agent]["action_masks"].reshape(-1, self.agents[agent]["action_masks"].shape[-1])
-            self.agents[agent]["clipfracs"] = []
+        pass
+
+    def update_policy(self, mb_inds = None):
+        """Update Q-tables using collected transitions (offline learning)"""
     
-    def update_policy(self, mb_inds):
         for agent in self.agents:
-            _, newlogprob, self.agents[agent]["entropy"], self.agents[agent]["newvalue"] = self.agents[agent]["policy"].get_action_and_value(
-                self.agents[agent]["batched"]["obs"][mb_inds],
-                self.agents[agent]["batched"]["actions"].long()[mb_inds],
-                action_mask=self.agents[agent]["batched"]["action_masks"][mb_inds],
-            )
-            logratio = newlogprob - self.agents[agent]["batched"]["logprobs"][mb_inds]
-            self.agents[agent]["ratio"] = logratio.exp()
+            for step in range(self.args.num_steps):
+                for env_idx in range(self.args.num_envs):
 
-            # Calculate the difference between the old policy and the new policy to limit the size of the update using args.clip_coef.
-            with torch.no_grad():
-                # calculate approx_kl http://joschu.net/blog/kl-approx.html
-                self.agents[agent]["old_approx_kl"] = (-logratio).mean()
-                self.agents[agent]["approx_kl"] = ((self.agents[agent]["ratio"] - 1) - logratio).mean()
-                self.agents[agent]["clipfracs"] += [
-                    ((self.agents[agent]["ratio"] - 1.0).abs() > self.args.clip_coef).float().mean().item()
-                ]
+                    # Update Q-table
+                    self.agents[agent]["policy"].update_q_table(
+                        obs=self.agents[agent]["obs"][step][env_idx].cpu().numpy(),
+                        action=self.agents[agent]["actions"][step][env_idx].cpu().numpy(),
+                        reward=self.agents[agent]["rewards"][step][env_idx].cpu().numpy(),
+                        next_obs=self.agents[agent]["next_obs"][env_idx].cpu().numpy(),
+                        done=self.dones[step][env_idx].cpu().numpy(),
+                        next_action_mask=self.agents[agent]["action_masks"][step + 1][env_idx].cpu().numpy() if step < self.args.num_steps - 1 else None,
+                        alpha=self.args.learning_rate,
+                        gamma=self.args.gamma
+                    )
+        self.episode += 1
+        self.decay_epsilon(self.episode)
 
-            self.agents[agent]["mb_advantages"] = self.agents[agent]["batched"]["advantages"][mb_inds]
-            if self.args.norm_adv:
-                self.agents[agent]["mb_advantages"] = (self.agents[agent]["mb_advantages"] - self.agents[agent]["mb_advantages"].mean()) / (self.agents[agent]["mb_advantages"].std() + 1e-8)
-    
-    def calculate_loss(self, mb_inds):
-        for agent in self.agents:
-            
-            # Value loss
-            newvalue = self.agents[agent]["newvalue"].view(-1)
-            # Calculate the MSE loss between the returns and the value predictions of the critic
-            # Clipping V loss is often not necessary and arguably worse in practice
-            if self.args.clip_vloss and not isinstance(self.agents[agent]["policy"], RLPolicyTableBased):
-                v_loss_unclipped = (newvalue - self.agents[agent]["batched"]["returns"][mb_inds]) ** 2
-                v_clipped = self.agents[agent]["batched"]["values"][mb_inds] + torch.clamp(
-                    newvalue - self.agents[agent]["batched"]["values"][mb_inds],
-                    -self.args.clip_coef,
-                    self.args.clip_coef,
-                )
-                v_loss_clipped = (v_clipped - self.agents[agent]["batched"]["returns"][mb_inds]) ** 2
-                v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
-                self.agents[agent]["value_loss"] = 0.5 * v_loss_max.mean()
-            else:
-                self.agents[agent]["value_loss"] = 0.5 * ((newvalue - self.agents[agent]["batched"]["returns"][mb_inds]) ** 2).mean()
-            
-            if isinstance(self.agents[agent]["policy"], RLPolicyActorCritic):
-                # Policy loss using PPO's ration clipping
-                pg_loss1 = -self.agents[agent]["mb_advantages"] * self.agents[agent]["ratio"]
-                pg_loss2 = -self.agents[agent]["mb_advantages"] * torch.clamp(
-                    self.agents[agent]["ratio"], 1 - self.args.clip_coef, 1 + self.args.clip_coef
-                )
-                # Add an entropy bonus to the loss
-                self.agents[agent]["entropy_loss"] = self.agents[agent]["entropy"].mean()
-                self.agents[agent]["policy_loss"] = torch.max(pg_loss1, pg_loss2).mean()
-                self.agents[agent]["loss"] = self.agents[agent]["policy_loss"] - self.args.ent_coef * self.agents[agent]["entropy_loss"] + self.agents[agent]["value_loss"] * self.args.vf_coef
-    
-    def backpropagate(self, update):
-        for agent in self.agents:
-            if isinstance(self.agents[agent]["policy"], RLPolicyTableBased):
-                # Update Q-table using a simple Q-learning update rule
-                with torch.no_grad():
-                    for idx in range(len(self.agents[agent]["batched"]["obs"])):
-                        obs = self.agents[agent]["batched"]["obs"][idx].cpu().numpy()
-                        action = self.agents[agent]["batched"]["actions"][idx].cpu().numpy()
-                        reward = self.agents[agent]["batched"]["returns"][idx].cpu().numpy()
-                        old_value = self.agents[agent]["policy"].q_table[obs][action]
-                        new_value = old_value + self.args.learning_rate * (reward - old_value)
-                        self.agents[agent]["policy"].q_table[obs][action] = new_value
-            else:
-                # Backpropagation for Actor-Critic policy
-                self.agents[agent]["optimizer"].zero_grad()
-                self.agents[agent]["loss"].backward()
-                nn.utils.clip_grad_norm_(self.agents[agent]["policy"].parameters(), self.args.max_grad_norm)
-                self.agents[agent]["optimizer"].step()
-
-                if self.args.anneal_lr == 'cosine_restarts': # cosine lr annealing, resetting at each evaluation/checkpoint
-                    self.agents[agent]["scheduler"].step(update)
-                else: # linear lr annealing
-                    frac = 1.0 - (update - 1.0) / self.args.num_updates
-                    lrnow = frac * self.args.learning_rate
-                    self.agents[agent]["optimizer"].param_groups[0]["lr"] = lrnow
-
-
-    
     def calculate_explained_variance(self):
-        for agent in self.agents:
-            pred, true = self.agents[agent]["batched"]["values"].cpu().numpy(), self.agents[agent]["batched"]["returns"].cpu().numpy()
-            var = np.var(true)
-            self.agents[agent]["explained_variance"] = np.nan if var == 0 else 1 - np.var(true - pred) / var
-    
+        pass
+
     def save_models(self):
         run_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
         agent_paths = {}
@@ -222,36 +161,93 @@ class RLTableHandler:
             agent_path = run_path.joinpath(f"{agent}_agent.pt")
             globalstep_path = run_path.joinpath(f"{agent}_{self.global_step}.pt")
             
-            if isinstance(self.agents[agent]["policy"], RLPolicyTableBased):
-                torch.save(self.agents[agent]["policy"].q_table, agent_path)
-                torch.save(self.agents[agent]["policy"].q_table, globalstep_path)
+            q_table_dict = dict(self.agents[agent]["policy"].q_table)
+            save_dict = {
+                'q_table': q_table_dict,
+                'epsilon': self.agents[agent]["policy"].epsilon,
+                'global_step': self.global_step,
+                'num_states': len(q_table_dict),
+            }
             
-            else:
-                torch.save(self.agents[agent]["policy"].state_dict(), agent_path)
-                torch.save(self.agents[agent]["policy"].state_dict(), globalstep_path)
-
+            torch.save(save_dict, agent_path)
+            torch.save(save_dict, globalstep_path)
+            print(f"Saved {agent} to {agent_path}")
+            
             if self.args.track:
                 import wandb
-                wandb.save(agent_path, base_path=run_path, policy="now")
-                wandb.save(globalstep_path, base_path=run_path, policy="now")
+                wandb.save(str(agent_path), base_path=str(run_path), policy="now")
+                wandb.save(str(globalstep_path), base_path=str(run_path), policy="now")
+                
             agent_paths[agent] = agent_path
         return agent_paths
-    
+
+    def load_models(self, path):
+        """Load Q-tables from disk"""
+        for agent in self.agents:
+            agent_path = path.joinpath(f"{agent}_agent.pt")
+            if os.path.exists(agent_path):
+                save_dict = torch.load(agent_path)
+                
+                # Restore Q-table
+                q_table_dict = save_dict['q_table']
+                self.agents[agent]["policy"].q_table = defaultdict(
+                    lambda: torch.zeros(self.agents[agent]["policy"].action_space_shape)
+                )
+                self.agents[agent]["policy"].q_table.update(q_table_dict)
+                
+                # Restore epsilon if saved
+                if 'epsilon' in save_dict:
+                    self.agents[agent]["policy"].epsilon = save_dict['epsilon']
+                    
     def log_training_metrics(self, writer):
         for agent in self.agents:
-            if isinstance(self.agents[agent]["policy"], RLPolicyActorCritic):
-                writer.add_scalar(f"charts/{agent}_actor_lr", self.agents[agent]["optimizer"].param_groups[0]["lr"], self.global_step)
-                writer.add_scalar(f"charts/{agent}_critic_lr", self.agents[agent]["optimizer"].param_groups[1]["lr"], self.global_step)
-                writer.add_scalar(f"losses/{agent}_policy_loss", self.agents[agent]["policy_loss"].item(), self.global_step)
-            writer.add_scalar(f"losses/{agent}_value_loss", self.agents[agent]["value_loss"].item(), self.global_step)
-            writer.add_scalar(f"losses/{agent}_entropy", self.agents[agent]["entropy_loss"].item(), self.global_step)
-            writer.add_scalar(f"losses/{agent}_old_approx_kl", self.agents[agent]["old_approx_kl"].item(), self.global_step)
-            writer.add_scalar(f"losses/{agent}_approx_kl", self.agents[agent]["approx_kl"].item(), self.global_step)
-            writer.add_scalar(f"losses/{agent}_clipfrac", np.mean(self.agents[agent]["clipfracs"]), self.global_step)
-            writer.add_scalar(f"losses/{agent}_explained_variance", self.agents[agent]["explained_variance"], self.global_step)
+            q_table = self.agents[agent]["policy"].q_table
+            num_states = len(q_table)
+            if num_states > 0:
+                all_q_values = torch.stack([v for v in q_table.values()])
+                mean_q = all_q_values.mean().item()
+                max_q = all_q_values.max().item()
+                writer.add_scalar(f"charts/{agent}_mean_q_value", mean_q, self.global_step)
+                writer.add_scalar(f"charts/{agent}_max_q_value", max_q, self.global_step)
+                writer.add_scalar(f"charts/{agent}_num_states_visited", num_states, self.global_step)
+            
 
     def reset(self):
+        """Reset environment and agent states"""
         for agent in self.agents:
             reset = self.envs.reset()[0]
             self.agents[agent]["resets"] = np.array(reset[agent])
             self.agents[agent]["next_obs"] = torch.Tensor(self.agents[agent]["resets"]).to(self.device)
+            self.agents[agent]["episode_rewards"] = torch.zeros(self.args.num_envs).to(self.device)
+            self.agents[agent]["episode_lengths"] = torch.zeros(self.args.num_envs).to(self.device)
+            self.dones = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
+            self.agents[agent]["obs"] = torch.zeros((self.args.num_steps, self.args.num_envs) + self.agents[agent]["next_obs"].shape[1:]).to(self.device)
+            self.agents[agent]["rewards"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
+            self.agents[agent]["action_masks"] = torch.zeros((self.args.num_steps, self.args.num_envs, self.agents[agent]["max_action_space_size"]), dtype=torch.bool).to(self.device)
+
+    def decay_epsilon(self, episode: int):
+        """Decay epsilon for epsilon-greedy exploration"""
+        for agent in self.agents:
+            if hasattr(self.agents[agent]["policy"], 'epsilon'):
+                # Linear decay
+                initial_epsilon = getattr(self.args, 'epsilon', 1.0)
+                final_epsilon = getattr(self.args, 'final_epsilon', 0.01)
+                decay_episodes = getattr(self.args, 'epsilon_decay_episodes', self.args.total_timesteps / 10) 
+                epsilon = initial_epsilon - (initial_epsilon - final_epsilon) * min(episode / decay_episodes, 1.0)
+                self.agents[agent]["policy"].epsilon = epsilon
+
+
+
+# path = "/Users/synneandreassen/Documents/MasterMaskinlæringCode/INF399/Environments/cyberwheel/cyberwheel/data/models/TableRLRedAgentvsRLBlueAgent/red_agent.pt"
+
+# # Load
+# ckpt = torch.load(path, map_location="cpu")
+
+# # Modify epsilon
+# ckpt['epsilon'] = 0.5  # Set desired value
+
+# # Save back
+# torch.save(ckpt, path)
+# print(f"Updated epsilon to {ckpt['epsilon']}")
+
+# python3 /Users/synneandreassen/Documents/MasterMaskinlæringCode/INF399/Environments/cyberwheel/cyberwheel/runners/rl_table_handler.py

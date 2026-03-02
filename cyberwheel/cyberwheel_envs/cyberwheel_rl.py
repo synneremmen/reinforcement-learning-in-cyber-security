@@ -59,14 +59,14 @@ class CyberwheelRL(gym.Env, Cyberwheel):
     
     def initialize_agents(self) -> None:
         max_net = self.args.network_size_compatibility
-        self.args.max_num_hosts = 5 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
-        self.args.max_num_subnets = 2 if max_net == 'small' else 100 if max_net == 'medium' else 1000 #if max_net == 'large'
+        self.args.max_num_hosts = 10 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
+        self.args.max_num_subnets = 5 if max_net == 'small' else 100 if max_net == 'medium' else 1000 #if max_net == 'large'
 
         self.blue_agent = getattr(blue_agents, self.args.agent_config["blue"]["class"])(network=self.network, args=self.args)
         self.red_agent = getattr(red_agents, self.args.agent_config["red"]["class"])(network=self.network, args=self.args)
 
         self.blue_max_action_space_size = self.args.max_num_subnets * self.blue_agent.action_space.num_actions if self.args.agent_config["blue"]["rl"] else None #self.blue_agent.action_space._action_space_size if self.args.agent_config["blue"]["rl"] else None
-        self.red_max_action_space_size = self.args.max_num_hosts * self.red_agent.action_space.num_actions * 2 if self.args.agent_config["red"]["rl"] else None
+        self.red_max_action_space_size = self.args.max_num_hosts * 2 * self.red_agent.action_space.num_actions if self.args.agent_config["red"]["rl"] else None
 
         self.max_blue_attr_value = self.args.max_decoys + 2 if self.args.agent_config["blue"]["rl"] else None # Max obs attribute is limited to when num_decoys_deployed exceeds max_decoys allowed
         self.max_red_attr_value = 4 if self.args.agent_config["red"]["rl"] else None # Max obs attribute is limited to the 'quadrant' attribute, which goes up to 4.

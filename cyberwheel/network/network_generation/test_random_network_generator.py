@@ -163,7 +163,7 @@ def generate_random_networks(n_networks=10, output_path="cyberwheel/data/configs
     for i in range(n_networks):
         if t == "table": # not exceed 6 hosts for table-based policy due to combinatorial explosion of state space
             num_subnets = (1, 2)
-            hosts_per_subnet = (2, 2)
+            hosts_per_subnet = (2, 5)
         else:
             num_subnets = (2, random.randint(3, 6))
             hosts_per_subnet = (3, random.randint(5, 12))

@@ -212,9 +212,9 @@ class Network:
             with_labels=labels,
             node_color=colors,
             node_size=30,
-            font_size=12,
+            font_size=8,
             font_color="black",
-            font_weight="bold",
+            # font_weight="bold",
             edge_color="black",
         )
 
@@ -253,10 +253,10 @@ class Network:
 
         ## parse topology
         # parse routers
-        routers = tqdm(config["routers"])
-        routers.set_description("Building Routers")
-        for r in routers:
-            routers.set_description(f"Building Routers: {r}", refresh=True)
+        # routers = tqdm(config["routers"])
+        # routers.set_description("Building Routers")
+        for r in config["routers"]:
+            # routers.set_description(f"Building Routers: {r}", refresh=True)
             router = Router(
                 r,
                 # val.get('routes', []),
@@ -264,10 +264,10 @@ class Network:
             )
             # add router to network graph
             network.add_router(router)
-        subnets = tqdm(config["subnets"])
-        subnets.set_description("Building Subnets")
-        for s in subnets:
-            subnets.set_description(f"Building Subnets: {s}", refresh=True)
+        # subnets = tqdm(config["subnets"])
+        # subnets.set_description("Building Subnets")
+        for s in config["subnets"]:
+            # subnets.set_description(f"Building Subnets: {s}", refresh=True)
             router = network.get_node_from_name(config["subnets"][s]["router"])
             subnet = Subnet(
                 s,
@@ -295,9 +295,9 @@ class Network:
             router_interface_ip = router.get_interface_ip(subnet.name)
             if subnet.dns_server is None and router_interface_ip is not None:
                 subnet.set_dns_server(router_interface_ip)
-        hosts = tqdm(config["hosts"])
-        hosts.set_description("Building Hosts")
-        for h in hosts:
+        # hosts = tqdm(config["hosts"])
+        # hosts.set_description("Building Hosts")
+        for h in config["hosts"]:
             # hosts.set_description(f"Building Hosts: {h}", refresh=True)
             # instantiate firewall rules, if defined
             val = config["hosts"][h]
@@ -328,12 +328,14 @@ class Network:
             if services_dict := val.get("services"):
                 for service in services_dict:
                     service = services_dict[service]
+                    version = service.get("version")
+                    version = str(version) if version is not None else None
                     services.append(
                         Service(
                             name=service["name"],
                             port=service["port"],
                             protocol=service.get("protocol"),
-                            version=service.get("version"),
+                            version=version,
                             vulns=service.get("vulns"),
                             description=service.get("descscription"),
                             decoy=service.get("decoy"),

@@ -199,31 +199,18 @@ class RLHandler:
     
     def backpropagate(self, update):
         for agent in self.agents:
-            if isinstance(self.agents[agent]["policy"], RLPolicyTableBased):
-                # Update Q-table using a simple Q-learning update rule
-                with torch.no_grad():
-                    for idx in range(len(self.agents[agent]["batched"]["obs"])):
-                        obs = self.agents[agent]["batched"]["obs"][idx].cpu().numpy()
-                        action = self.agents[agent]["batched"]["actions"][idx].cpu().numpy()
-                        reward = self.agents[agent]["batched"]["returns"][idx].cpu().numpy()
-                        old_value = self.agents[agent]["policy"].q_table[obs][action]
-                        new_value = old_value + self.args.learning_rate * (reward - old_value)
-                        self.agents[agent]["policy"].q_table[obs][action] = new_value
-            else:
-                # Backpropagation for Actor-Critic policy
-                self.agents[agent]["optimizer"].zero_grad()
-                self.agents[agent]["loss"].backward()
-                nn.utils.clip_grad_norm_(self.agents[agent]["policy"].parameters(), self.args.max_grad_norm)
-                self.agents[agent]["optimizer"].step()
+            # Backpropagation for Actor-Critic policy
+            self.agents[agent]["optimizer"].zero_grad()
+            self.agents[agent]["loss"].backward()
+            nn.utils.clip_grad_norm_(self.agents[agent]["policy"].parameters(), self.args.max_grad_norm)
+            self.agents[agent]["optimizer"].step()
 
-                if self.args.anneal_lr == 'cosine_restarts': # cosine lr annealing, resetting at each evaluation/checkpoint
-                    self.agents[agent]["scheduler"].step(update)
-                else: # linear lr annealing
-                    frac = 1.0 - (update - 1.0) / self.args.num_updates
-                    lrnow = frac * self.args.learning_rate
-                    self.agents[agent]["optimizer"].param_groups[0]["lr"] = lrnow
-
-
+            if self.args.anneal_lr == 'cosine_restarts': # cosine lr annealing, resetting at each evaluation/checkpoint
+                self.agents[agent]["scheduler"].step(update)
+            else: # linear lr annealing
+                frac = 1.0 - (update - 1.0) / self.args.num_updates
+                lrnow = frac * self.args.learning_rate
+                self.agents[agent]["optimizer"].param_groups[0]["lr"] = lrnow
     
     def calculate_explained_variance(self):
         for agent in self.agents:
@@ -239,14 +226,9 @@ class RLHandler:
         for agent in self.agents:
             agent_path = run_path.joinpath(f"{agent}_agent.pt")
             globalstep_path = run_path.joinpath(f"{agent}_{self.global_step}.pt")
-            
-            if isinstance(self.agents[agent]["policy"], RLPolicyTableBased):
-                torch.save(self.agents[agent]["policy"].q_table, agent_path)
-                torch.save(self.agents[agent]["policy"].q_table, globalstep_path)
-            
-            else:
-                torch.save(self.agents[agent]["policy"].state_dict(), agent_path)
-                torch.save(self.agents[agent]["policy"].state_dict(), globalstep_path)
+
+            torch.save(self.agents[agent]["policy"].state_dict(), agent_path)
+            torch.save(self.agents[agent]["policy"].state_dict(), globalstep_path)
 
             if self.args.track:
                 import wandb
@@ -257,10 +239,9 @@ class RLHandler:
     
     def log_training_metrics(self, writer):
         for agent in self.agents:
-            if isinstance(self.agents[agent]["policy"], RLPolicyActorCritic):
-                writer.add_scalar(f"charts/{agent}_actor_lr", self.agents[agent]["optimizer"].param_groups[0]["lr"], self.global_step)
-                writer.add_scalar(f"charts/{agent}_critic_lr", self.agents[agent]["optimizer"].param_groups[1]["lr"], self.global_step)
-                writer.add_scalar(f"losses/{agent}_policy_loss", self.agents[agent]["policy_loss"].item(), self.global_step)
+            writer.add_scalar(f"charts/{agent}_actor_lr", self.agents[agent]["optimizer"].param_groups[0]["lr"], self.global_step)
+            writer.add_scalar(f"charts/{agent}_critic_lr", self.agents[agent]["optimizer"].param_groups[1]["lr"], self.global_step)
+            writer.add_scalar(f"losses/{agent}_policy_loss", self.agents[agent]["policy_loss"].item(), self.global_step)
             writer.add_scalar(f"losses/{agent}_value_loss", self.agents[agent]["value_loss"].item(), self.global_step)
             writer.add_scalar(f"losses/{agent}_entropy", self.agents[agent]["entropy_loss"].item(), self.global_step)
             writer.add_scalar(f"losses/{agent}_old_approx_kl", self.agents[agent]["old_approx_kl"].item(), self.global_step)

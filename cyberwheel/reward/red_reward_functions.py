@@ -17,15 +17,10 @@ def reward_decoy_hits(rewarder, **kwargs):
     
 
     if red_agent_result.success and red_target in valid_targets: # If red action succeeded on a Host
-        print(f"Red action: {red_action}, Target: {red_target}, Is decoy: {red_target_is_decoy}")
-        # print("Valid target attacked successfully.")
         r = rewarder.red_rewards[red_action][0] * 1
         r_recurring = rewarder.red_rewards[red_action][1] * 1
 
     elif red_agent_result.success and red_target not in valid_targets:
-        print(f"Red action: {red_action}, Target: {red_target}, Is decoy: {red_target_is_decoy}")
-        # print(f"Valid targets: {valid_targets}")
-        # print("Invalid target attacked successfully.")
         r = rewarder.red_rewards[red_action][0] * 0
         r_recurring = rewarder.red_rewards[red_action][1] * 0
 
@@ -38,7 +33,7 @@ def reward_decoy_hits(rewarder, **kwargs):
     #rewarder.red_agent.observation.update_obs(current_step=rewarder.current_step, total_steps=rewarder.red_agent.args.num_steps)
 
     quad = (rewarder.current_step * 4) // rewarder.red_agent.args.num_steps + 1  #rewarder.red_agent.args.num_steps rewarder.red_agent.observation.standalone_obs["quadrant"]
-    red_multiplier = 10 if quad == 1 else 1
+    red_multiplier = 10 if quad == 1 else 1 # if early in the game, reward is more valuable
     r *= red_multiplier
 
     return r, r_recurring

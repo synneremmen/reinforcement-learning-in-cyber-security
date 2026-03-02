@@ -41,6 +41,7 @@ class RedObservation(Observation):
             ObservationAttribute("on_host", 'bool'),
             ObservationAttribute("escalated", 'bool'),
             ObservationAttribute("impacted", 'bool'),
+            ObservationAttribute("visited", 'bool'),
         ]
         self.attributes["subnet"] = [] # Define all subnet-level observations
         self.attributes["standalone"] = [ # Define all standalone observations
