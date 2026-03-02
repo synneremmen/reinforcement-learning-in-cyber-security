@@ -2,27 +2,27 @@ actions: # All actions in this killchain (pingsweep -> impact) are required.
   pingsweep:
     class: ARTPingSweep
     reward:
-      immediate: 10
+      immediate: 0
       recurring: 0
   portscan:
     class: ARTPortScan
     reward:
-      immediate: 10
+      immediate: 0
       recurring: 0
   discovery:
     class: ARTDiscovery
     reward:
-      immediate: 10
+      immediate: 20
       recurring: 0
   lateral-movement:
     class: ARTLateralMovement
     reward:
-      immediate: 10
+      immediate: 0
       recurring: 0
   privilege-escalation:
     class: ARTPrivilegeEscalation
     reward:
-      immediate: 20
+      immediate: 0
       recurring: 0
   impact:
     class: ARTImpact
