@@ -58,11 +58,13 @@ class Service(BaseModel):
         vulns = service.get("cve", [])
         # vulns = [cls.create_vuln_from_list(v) for v in service_vulns]
 
+        version = service.get("version")
+        version = str(version) if version is not None else None
         return Service(
             name=service.get("name"),  # type: ignore
             port=service.get("port", 1),  # type: ignore
             protocol=service.get("protocol", "tcp"),  # type: ignore
-            version=service.get("version"),  # type: ignore
+            version=version,  # type: ignore
             vulns=vulns,
             description=service.get("description"),  # type: ignore
             decoy=service.get("decoy"),
@@ -77,12 +79,14 @@ class Service(BaseModel):
         service = service_objs.get(service_str, {})
         vulns = service.get("cve", set())
         # vulns = [cls.create_vuln_from_list(v) for v in service_vulns]
-
+        
+        version = service.get("version")
+        version = str(version) if version is not None else None
         return Service(
             name=service_str,  # type: ignore
             port=service.get("port", 1),  # type: ignore
             protocol=service.get("protocol", "tcp"),  # type: ignore
-            version=service.get("version"),  # type: ignore
+            version=version,  # type: ignore
             vulns=set(vulns),
             description=service.get("description"),  # type: ignore
             decoy=service.get("decoy"),
