@@ -29,7 +29,7 @@ class RLTrainer:
         m = importlib.import_module("cyberwheel.cyberwheel_envs")
         self.env = getattr(m, args.environment)
         self.args.deterministic = os.getenv("CYBERWHEEL_DETERMINISTIC", "False").lower() in ('true', '1', 't')
-        self.seed = args.seed
+        self.seed = args.seed if self.args.deterministic else random.randint(0, 1000000)
         self.define_vars = True
 
         self.agents = {}
