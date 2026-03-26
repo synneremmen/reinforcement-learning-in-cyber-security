@@ -1,0 +1,73 @@
+host_type_config:
+hosts:
+  host0:
+    firewall:
+    routes:
+    subnet: subnet0
+    type: workstation
+  host1:
+    firewall:
+    routes:
+    subnet: subnet0
+    type: workstation
+  host2:
+    firewall:
+    routes:
+    subnet: subnet1
+    type: workstation
+  host3:
+    firewall:
+    routes:
+    subnet: subnet1
+    type: workstation
+  server0:
+    firewall:
+    routes:
+    subnet: subnet0
+    type: proxy_server
+  server1:
+    firewall:
+    routes:
+    subnet: subnet1
+    type: proxy_server
+interfaces:
+  host0:
+  - server0
+  host1:
+  - host2
+  host2:
+  - host1
+  host3:
+  - server1
+  server0:
+  - host0
+  server1:
+  - host3
+network:
+  desc: default description
+  name: 6-host-network
+routers:
+  core_router:
+    default_route:
+    firewall:
+    routes:
+    routes_by_name:
+subnets:
+  subnet0:
+    firewall:
+    ip_range: 192.168.0.0/24
+    router: core_router
+  subnet1:
+    firewall:
+    ip_range: 192.168.0.0/24
+    router: core_router
+topology:
+  core_router:
+    subnet0:
+    - host0
+    - host1
+    - server0
+    subnet1:
+    - host2
+    - host3
+    - server1
