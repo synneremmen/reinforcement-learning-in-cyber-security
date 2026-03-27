@@ -18,48 +18,53 @@ host_types:
     decoy: false
     os: windows
   web_server:
-    type: SERVER
+    type: WEB_SERVER
     services:
       - WindowsDiscoveryExploitableService
       - WindowsLateralMovementExploitableService
       - WindowsPrivilegeEscalationExploitableService
       - WindowsImpactExploitableService
+      - WindowsWebServerRoleExploitableService
     decoy: false
     os: windows
   mail_server:
-    type: SERVER
+    type: MAIL_SERVER
     services:
       - WindowsDiscoveryExploitableService
       - WindowsLateralMovementExploitableService
       - WindowsPrivilegeEscalationExploitableService
       - WindowsImpactExploitableService
+      - WindowsMailServerRoleExploitableService
     decoy: false
     os: windows
   file_server:
-    type: SERVER
+    type: FILE_SERVER
     services:
       - WindowsDiscoveryExploitableService
       - WindowsLateralMovementExploitableService
       - WindowsPrivilegeEscalationExploitableService
       - WindowsImpactExploitableService
+      - WindowsFileServerRoleExploitableService
     decoy: false
     os: windows
   ssh_jump_server:
-    type: SERVER
+    type: SSH_JUMP_SERVER
     services:
       - WindowsDiscoveryExploitableService
       - WindowsLateralMovementExploitableService
       - WindowsPrivilegeEscalationExploitableService
       - WindowsImpactExploitableService
+      - WindowsSshJumpServerRoleExploitableService
     decoy: false
     os: windows
   proxy_server:
-    type: SERVER
+    type: PROXY_SERVER
     services:
       - WindowsDiscoveryExploitableService
       - WindowsLateralMovementExploitableService
       - WindowsPrivilegeEscalationExploitableService
       - WindowsImpactExploitableService
+      - WindowsProxyServerRoleExploitableService
     decoy: false
     os: windows
   decoy_server:
