@@ -28,8 +28,6 @@ class RLHandler:
         for agent in agents:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
-            print("Action space size", self.agents[agent]["max_action_space_size"])
-            print("Observation space shape", self.agents[agent]["shape"])
             if self.args.policy_type == "table_based":
                 self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"]).to(self.device)
             else:
@@ -109,7 +107,7 @@ class RLHandler:
             mean_rew = self.agents[agent]["rewards"].sum(axis=0).mean()
             output_str += f", {agent}_episodic_return={mean_rew}"
             writer.add_scalar(f"charts/{agent}_episodic_return", mean_rew, self.global_step)
-        print(output_str)
+        # print(output_str)
         writer.add_scalar(f"charts/episodic_runtime", episodic_runtime, self.global_step)
         writer.add_scalar(f"charts/episodic_process_time", episodic_processing_time, self.global_step)
 

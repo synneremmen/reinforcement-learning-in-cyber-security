@@ -181,7 +181,12 @@ def update_graph(episode, step, graph_name):
     customdata = []
     for node in G.nodes():
         commands = []
-        state = f"{node}:\n{G.nodes[node]['state']}"
+        host_type = G.nodes[node].get("host_type", "")
+        if host_type:
+            type_str = f" ({host_type.name})" if hasattr(host_type, 'name') else f" ({str(host_type)})"
+        else:
+            type_str = ""
+        state = f"{node}{type_str}:\n{G.nodes[node]['state']}"
         for c in G.nodes[node]["commands"]:
             commands.append(c)
             commands.append(html.Br())

@@ -67,11 +67,12 @@ class RedDiscreteActionSpace:
 
     def add_host(self, host_name: str) -> None:
         if 'available' in self.hosts:
-            i = self.hosts.index('available')
-            self.hosts[self.hosts.index('available')] = host_name
+            host_slot = self.hosts.index('available')
+            i = host_slot * self.num_actions
+            self.hosts[host_slot] = host_name
             self.num_hosts += 1
         else:
-            i = self._action_space_size
+            i = self._action_space_size - 1
             self._action_space_size += len(self.actions)
             self.hosts += [host_name]
             self.num_hosts += 1
@@ -90,7 +91,7 @@ class RedDiscreteActionSpace:
         return Discrete(max_size)
 
     def reset(self, entry_host: str) -> None:
-        self._action_space_size: int = len(self.actions)
+        self._action_space_size: int = len(self.actions) + 1
         self.num_hosts = 1
         self.hosts = [entry_host]
         self.host_index_map = {entry_host: 0}

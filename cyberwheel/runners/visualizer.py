@@ -126,6 +126,8 @@ class Visualizer:
             color = "gray"
             state = "Safe"
             commands = []
+            host_type = ""
+            
             if (
                 isinstance(G.nodes[node_name]["data"], Host)
                 and G.nodes[node_name]["data"].name == target_host
@@ -138,6 +140,10 @@ class Visualizer:
                 color = "gray"
                 state = "Scanned" if color == "yellow" else "Safe"
             else:
+                # Extract host type if it's a Host object
+                if isinstance(G.nodes[node_name]["data"], Host):
+                    host_type = G.nodes[node_name]["data"].host_type
+                
                 if node_name in self.host_mapping:
                     color = self.host_mapping[node_name]["color"]
                     if color == "green":
@@ -167,6 +173,7 @@ class Visualizer:
                     
             G.nodes[node_name]["color"] = color
             G.nodes[node_name]["state"] = state
+            G.nodes[node_name]["host_type"] = host_type
             G.nodes[node_name]["commands"].extend(commands)
             G.nodes[node_name]["outline_color"] = edgecolor
             G.nodes[node_name]["outline_width"] = linewidth

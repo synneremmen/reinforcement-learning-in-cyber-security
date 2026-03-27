@@ -19,12 +19,12 @@ if __name__ == "__main__":
             phase = 'pingsweep'
             tech = 'ARTPingSweep'
             techniques[tech] = [phase]
-            immediate_reward = 5
+            immediate_reward = 0
         elif tech == 'RemoteSystemDiscovery':
             phase = 'portscan'
             tech = 'ARTPortScan'
             techniques[tech] = [phase]
-            immediate_reward = 5
+            immediate_reward = 0
         elif 'discovery' in phases:
             phase = 'discovery'
             techniques[tech] = [phase]
@@ -36,11 +36,11 @@ if __name__ == "__main__":
         elif 'privilege-escalation' in phases:
             phase = 'privilege-escalation'
             techniques[tech] = [phase]
-            immediate_reward = 40
+            immediate_reward = 0
         elif 'lateral-movement' in phases:
             phase = 'lateral-movement'
             techniques[tech] = [phase]
-            immediate_reward = 5
+            immediate_reward = 0
         else: # do not include techniques that do not fit into these phases
             del techniques[tech] 
             continue
@@ -54,8 +54,8 @@ if __name__ == "__main__":
     else:   
         combined_data = data + new_data
 
-    with open(file, "w") as f:
-        f.write(combined_data)
+    # with open(file, "w") as f:
+    #    f.write(combined_data)
 
     tech_phases_dict = {}
     total = 0

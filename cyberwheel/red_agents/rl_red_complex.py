@@ -147,10 +147,10 @@ class RLComplexAgent(ARTAgent):
         action = result.action
         src_host = result.src_host.name
         target_host = result.target_host.name
-        if isinstance(action, type):
-            phase = self.phase_map.get(action.__name__, '')
-        else:
-            phase = ''
+        try:
+            phase = self.phase_map[action.__name__]
+        except KeyError:
+            phase = action.name
         if phase == "pingsweep":  # Adds pingsweeped hosts to obs
             self.observation.update_host(target_host, sweeped=True)
             hosts = result.metadata[result.target_host.subnet.name]["sweeped_hosts"]
@@ -190,7 +190,10 @@ class RLComplexAgent(ARTAgent):
     def validate_action(self, action, target_host: str) -> bool:
         if action == Nothing:
             return True
-        phase = self.phase_map.get(action.__name__, '')
+        try:
+            phase = self.phase_map[action.__name__]
+        except KeyError:
+            phase = action.name
         host_view = self.observation.obs[target_host]
         # print("Host view:", host_view)
         if phase == "pingsweep":  # valid if host hasn't been sweeped
