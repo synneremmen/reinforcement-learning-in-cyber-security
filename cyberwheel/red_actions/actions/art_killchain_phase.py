@@ -229,29 +229,32 @@ class ARTKillChainPhase(ARTAction):
 
         if len(self.valid_techniques) > 0:
             self.action_results.add_successful_action()
-            mitre_id = random.choice(
-                self.valid_techniques
-            )  # Change to look for depending on service
-            art_technique = art_techniques.technique_mapping[mitre_id]
+            candidates = []
+            for mitre_id in self.valid_techniques:
+                art_technique = art_techniques.technique_mapping[mitre_id]
+                if art_technique is None:
+                    continue
+                for at in art_technique.get_atomic_tests():
+                    if host_os not in at.supported_platforms:
+                        continue
+                    if at.executor is None or not at.executor.command:
+                        continue
+                    candidates.append((mitre_id, art_technique, at))
 
-            processes = []
-            valid_tests = [
-                at
-                for at in art_technique.get_atomic_tests()
-                if host_os in at.supported_platforms
-            ]
-            if len(valid_tests) == 0: # if it does not support any platform, just return
+            if len(candidates) == 0:
                 self.action_results.attack_success = False
                 return self.action_results
             
-            chosen_test = random.choice(valid_tests)
+            candidate = random.choice(candidates)
+            mitre_id, art_technique, chosen_test = candidate
+            processes = []
             # Get prereq command, prereq command (if dependency). then run executor command(s) and cleanup command.
             for dep in chosen_test.dependencies:
                 processes.extend(dep.get_prerequisite_command)
                 processes.extend(dep.prerequisite_command)
-            if chosen_test.executor != None:
-                processes.extend(chosen_test.executor.command)
-                processes.extend(chosen_test.executor.cleanup_command)
+            # if chosen_test.executor != None:
+            #     processes.extend(chosen_test.executor.command)
+            #     processes.extend(chosen_test.executor.cleanup_command)
             for p in processes:
                 host.run_command(chosen_test.executor, p, "root")
             self.action_results.add_metadata(
