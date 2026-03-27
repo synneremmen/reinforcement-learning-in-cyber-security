@@ -1,3 +1,4 @@
+from cyberwheel.network.network_generation.test_random_network_generator import generate_random_networks
 import pandas as pd
 import time
 
@@ -15,10 +16,14 @@ class BaselineRunner:
 
 
     def configure(self):
-        network_config = files("cyberwheel.data.configs.network").joinpath(
-            self.args.network_config
-        )
-        network = Network.create_network_from_yaml(network_config)
+        if self.args.network_config is not None:
+            network_config = files("cyberwheel.data.configs.network").joinpath(
+                self.args.network_config
+            )
+            network = Network.create_network_from_yaml(network_config)
+        else:
+            network_file = generate_random_networks(n_networks=1, output_path="cyberwheel/data/configs/network", t="table")
+            network = Network.create_network_from_yaml(network_file[0])
 
         self.args.service_mapping = get_service_map(network)
 

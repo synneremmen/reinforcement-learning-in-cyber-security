@@ -91,7 +91,7 @@ class RandomNetworkGenerator:
             for j in range(n_hosts):
                 host_name = f"host_{host_id:03d}" # format: pad with leading zeros to ensure 3 digits
                 # host_type = self.rng.choice(host_types) # add probabilities?
-                host_type = self.rng.choices(host_types, weights=[0.15, 0.15, 0.15, 0.15, 0.08, 0.5], k=1)[0]
+                host_type = self.rng.choices(host_types, weights=[0.15, 0.15, 0.15, 0.15, 0.15, 0.5], k=1)[0]
                 # higher chance of workstation (user hosts), lower chance of proxy_server
                 
                 if j == n_hosts - 1:
@@ -125,8 +125,48 @@ class RandomNetworkGenerator:
             if len(all_hosts) >= 2:
                 host1, host2 = self.rng.sample(all_hosts, 2)
                 network.interface(host1, host2)
+
+        # Ensure at least one cross-subnet bridge when multiple subnets exist.
+        if len(subnet_names) >= 2:
+            interfaces = network.data.get("interfaces") or {}
+
+            def has_cross_subnet_interface() -> bool:
+                for src, dst_list in interfaces.items():
+                    src_subnet = network.data["hosts"].get(src, {}).get("subnet")
+                    if not src_subnet:
+                        continue
+                    for dst in dst_list:
+                        dst_subnet = network.data["hosts"].get(dst, {}).get("subnet")
+                        if dst_subnet and dst_subnet != src_subnet:
+                            return True
+                return False
+
+            if not has_cross_subnet_interface():
+                subnet_to_hosts = {}
+                for host_name, host_data in network.data["hosts"].items():
+                    subnet = host_data.get("subnet")
+                    if not subnet:
+                        continue
+                    subnet_to_hosts.setdefault(subnet, []).append(host_name)
+
+                eligible_subnets = [s for s, hosts in subnet_to_hosts.items() if len(hosts) > 0]
+                if len(eligible_subnets) >= 2:
+                    candidates = []
+                    for i, subnet_a in enumerate(eligible_subnets):
+                        for subnet_b in eligible_subnets[i + 1:]:
+                            for host_a in subnet_to_hosts[subnet_a]:
+                                for host_b in subnet_to_hosts[subnet_b]:
+                                    candidates.append((host_a, host_b))
+
+                    self.rng.shuffle(candidates)
+                    for host_a, host_b in candidates:
+                        existing_a = interfaces.get(host_a, [])
+                        existing_b = interfaces.get(host_b, [])
+                        if host_b not in existing_a and host_a not in existing_b:
+                            network.interface(host_a, host_b)
+                            break
         
-        print(f"Generated random network '{network_name}' with {n_subnets} subnets and {host_id} hosts.")
+        # print(f"Generated random network '{network_name}' with {n_subnets} subnets and {host_id} hosts.")
         return network
     
     def generate_and_save(self, output_path="cyberwheel/data/configs/network", **kwargs):
@@ -162,13 +202,13 @@ def generate_random_networks(n_networks=10, output_path="cyberwheel/data/configs
     
     for i in range(n_networks):
         if t == "table": # not exceed 6 hosts for table-based policy due to combinatorial explosion of state space
-            num_subnets = (1, 2)
-            hosts_per_subnet = (2, 5)
+            num_subnets = (2, 2)
+            hosts_per_subnet = (2, 3)
         else:
             num_subnets = (2, random.randint(3, 6))
             hosts_per_subnet = (3, random.randint(5, 12))
-        print(f"Generating network {i+1}/{n_networks} with num_subnets={num_subnets} and hosts_per_subnet={hosts_per_subnet}")
-        
+        # print(f"Generating network {i+1}/{n_networks} with num_subnets={num_subnets} and hosts_per_subnet={hosts_per_subnet}")
+        i = 1
         file_path = generator.generate_and_save(
             output_path=output_path,
             num_subnets=num_subnets,
@@ -193,7 +233,7 @@ if __name__ == "__main__":
     # Save to file
     network.output_yaml(path="./")
     
-    print(f"Generated network: {network.file_name}.yaml")
+    # print(f"Generated network: {network.file_name}.yaml")
     
     # Or generate multiple networks at once
     # files = generate_random_networks(n_networks=5, output_path="cyberwheel/data/configs/network", seed=123)

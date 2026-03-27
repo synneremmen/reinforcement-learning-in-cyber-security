@@ -231,7 +231,7 @@ class RLTrainer:
                 t = "table"
             else: 
                 t = ""
-            network_files = generate_random_networks(n_networks=self.args.num_envs, output_path="cyberwheel/data/configs/network", seed=self.args.seed if self.args.deterministic else None, t=t)
+            network_files = generate_random_networks(n_networks=self.args.num_envs, output_path="cyberwheel/data/configs/network", t=t)
             for i, net_file in enumerate(network_files):
                 network = Network.create_network_from_yaml(net_file)
                 network_name = network.name
@@ -297,6 +297,7 @@ class RLTrainer:
 
         # Run an episode in each environment. This loop collects experience which is later used for optimization.
         for step in range(0, self.args.num_steps):
+            # print(f"Step {step + 1}/{self.args.num_steps}", end="\r")
             # Set determinism if applicable
             if self.args.deterministic:
                 set_seed(self.seed)
@@ -321,29 +322,32 @@ class RLTrainer:
         if isinstance(self.handler, RLPolicyActorCritic):
             self.handler.compute_gae()
 
-        # Flatten the batch
-        self.handler.flatten_batch()
+            # Flatten the batch
+            self.handler.flatten_batch()
 
-        # Optimizing the policy and value network 
-        b_inds = np.arange(self.args.batch_size)
+            # Optimizing the policy and value network 
+            b_inds = np.arange(self.args.batch_size)
 
-        # Iterate over multiple epochs which each update the policy using all of the batch data
-        for epoch in range(self.args.update_epochs):
-            np.random.shuffle(b_inds)
+            # Iterate over multiple epochs which each update the policy using all of the batch data
+            for epoch in range(self.args.update_epochs):
+                np.random.shuffle(b_inds)
 
-            # For each epoch, split the batch into minibatches for smaller updates
-            for start in range(0, self.args.batch_size, self.args.minibatch_size):
-                end = start + self.args.minibatch_size
-                mb_inds = b_inds[start:end]
+                # For each epoch, split the batch into minibatches for smaller updates
+                for start in range(0, self.args.batch_size, self.args.minibatch_size):
+                    end = start + self.args.minibatch_size
+                    mb_inds = b_inds[start:end]
 
-                self.handler.update_policy(mb_inds)
-                if isinstance(self.handler, RLPolicyActorCritic):
-                    self.handler.calculate_loss(mb_inds)
-                    self.handler.backpropagate(update)
+                    self.handler.update_policy(mb_inds)
+                    if isinstance(self.handler, RLPolicyActorCritic):
+                        self.handler.calculate_loss(mb_inds)
+                        self.handler.backpropagate(update)
 
-            if self.args.target_kl is not None:
-                if self.handler.approx_kl > self.args.target_kl:
-                    break
+                if self.args.target_kl is not None:
+                    if self.handler.approx_kl > self.args.target_kl:
+                        break
+
+        if isinstance(self.handler, RLTableHandler):
+            self.handler.update_policy()
 
         self.handler.calculate_explained_variance()
 
@@ -394,12 +398,13 @@ class RLTrainer:
                         eval_return[network_name][agent],
                         self.handler.global_step,
                     )
+                print(f"Evaluation results for network {network_name} hosts gave return {eval_return[network_name][agent]}")
 
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         #print(f"Actor: {self.optimizer.param_groups[0]['lr']}")
         #print(f"Critic: {self.optimizer.param_groups[1]['lr']}")
         sps = int((self.args.num_steps * self.args.num_envs) / (time.time() - train_start_time))
-        print("SPS:", sps)
+        # print("SPS:", sps)
         process_sps = int((self.args.num_steps * self.args.num_envs) / (time.process_time() - train_start_process_time))
         self.writer.add_scalar("charts/SPS", sps, self.handler.global_step)
         self.writer.add_scalar("charts/process_SPS", process_sps, self.handler.global_step)
