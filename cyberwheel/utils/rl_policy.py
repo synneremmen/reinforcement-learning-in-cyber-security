@@ -68,25 +68,19 @@ class RLPolicyTableBased(nn.Module):
     """
     TODO: Add header
     """
-    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.1, num_hosts=10):
+    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.1, num_hosts=6):
         super().__init__()
-        # Policy table has an input layer of the size of S, and an output layer of the size of A.
-        # Predicts the best action to take at the current state.
         obs_space_shape = int(np.array(obs_space_shape).prod())
         self.obs_space_shape = obs_space_shape
         self.action_space_shape = action_space_shape
         self.num_hosts = num_hosts # TODO: hardcoded, bad coding...
-        self.state_space = (1 + 3 * 2**6)**self.num_hosts
-        self.compressed_state_space = (1 + 3 * 2*4)**self.num_hosts # given that we compress the 7 host-level attributes to 3, and keep the global attribute, we get 1 + 3*6 possible combinations per host
+        # self.state_space = (1 + 3 * 2**6)**self.num_hosts
+        # self.compressed_state_space = (1 + 3 * 2*4)**self.num_hosts # given that we compress the 7 host-level attributes to 3, and keep the global attribute, we get 1 + 3*6 possible combinations per host
         print(f"Using {self.num_hosts} hosts:")
-        #print(f"Calculated state space: {self.state_space}")
-        #print(f"Calculated compressed state space: {self.compressed_state_space}")
         #print(f"Size of q_table: {self.compressed_state_space} x {self.action_space_shape} = {self.compressed_state_space * self.action_space_shape} entries")
-        #print("Total size of q_table for compressed state space in GB:", self.compressed_state_space * self.action_space_shape * 4 / (1024**3)) # 4 bytes per float32
-        #print("Total size of q_table for original state space in GB:", self.state_space * self.action_space_shape * 4 / (1024**3)) # 4 bytes per float32
-        self.q_table = defaultdict(lambda: torch.zeros(self.action_space_shape))
-        # self.q_table = torch.zeros(self.compressed_state_space, self.action_space_shape)
-        print(f"Initialized Q-table with shape {self.q_table} ")
+        self.q_table = defaultdict(lambda: torch.rand(self.action_space_shape))
+        # default to random values [0,1] to encourage exploration of unseen actions?
+        print(f"Initialized Q-table with shape {len(self.q_table)} x {self.action_space_shape} = {len(self.q_table) * self.action_space_shape} entries")
         self.epsilon = epsilon
 
     def obs_to_state(self, obs):
@@ -98,9 +92,9 @@ class RLPolicyTableBased(nn.Module):
         host_obs = host_obs.reshape(self.num_hosts, -1)[:,:8]
         for host_idx in range(self.num_hosts):
             host_features = host_obs[host_idx]
-            type_, sweeped, scanned, discovered, on_host, escalated, impacted, visited = host_features
+            type_, sweeped, scanned, discovered, on_host, escalated, impacted = host_features # , visited
             
-            if impacted == 1: # get state
+            if impacted == 1:
                 curr = 4
             elif escalated == 1:
                 curr = 3
@@ -112,7 +106,8 @@ class RLPolicyTableBased(nn.Module):
                 curr = 0
             else:
                 curr = -1
-            state.append([int(type_), int(on_host), int(curr), int(visited)])
+
+            state.append([int(type_), int(on_host), int(curr)])
         state = np.array(state).flatten()
         state = np.concatenate([state, global_att])
         return tuple(state)
@@ -127,15 +122,24 @@ class RLPolicyTableBased(nn.Module):
     def get_value(self, state, action): # best action value for a given state
         return self.q_table[state][action].item() 
     
+    def get_best_value(self, state, action_mask=None):
+        if action_mask is not None:
+            q_values = self.q_table[state].clone()
+            # q_values[~torch.tensor(action_mask, dtype=torch.bool)] = float("-inf")
+            q_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)] = float("-inf")
+            best_value = torch.max(q_values).item()
+        else:
+            best_value = torch.max(self.q_table[state]).item()
+        return best_value
+    
     def greedy_action(self, state, action_mask=None):
         # action_values = self.q_table[state]
         action_values = self.q_table.setdefault(
-        state, torch.zeros(self.action_space_shape) 
-        # default to random values [0,1] to encourage exploration of unseen actions?
+        state, torch.rand(self.action_space_shape) 
         )
         if action_mask is not None:
             action_values = action_values.clone()
-            action_values[action_mask == 0] = float("-inf")
+            action_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=action_values.device)] = float("-inf")
         greedy_action = torch.argmax(action_values)
         return greedy_action.item()
     
@@ -151,31 +155,31 @@ class RLPolicyTableBased(nn.Module):
         else:
             return self.greedy_action(state, action_mask)
 
+    def normalize_reward(self, reward):
+        # min_v = -10 # worst reward
+        # max_v = 1000 # best possible reward (capture the flag)
+        # how would i do this if z-score normalization?
+        # return (reward - self.reward_mean) / (self.reward_std + 1e-9)
+        return reward #  (reward - min_v) / (max_v - min_v) # number between 0 and 1
+
     def update_q_table(self, obs, action, reward, next_obs, done, next_action_mask=None, alpha=0.1, gamma=0.99):
         """Update Q-table using Q-learning update rule"""
         state = self.obs_to_state(obs)
         next_state = self.obs_to_state(next_obs)
+        normalized_reward = self.normalize_reward(reward)
     
         if done:
-            td_target = reward
+            td_target = normalized_reward
         else:
-            if next_action_mask is not None:
-                next_action_mask_tensor = torch.tensor(next_action_mask, dtype=torch.bool)
-                next_q_values = self.q_table[next_state] * next_action_mask_tensor
-                best_next_q = torch.max(next_q_values).item()
-            else:
-                best_next_q = torch.max(self.q_table[next_state]).item()
-            td_target = reward + gamma * best_next_q
+            best_next_q = self.get_best_value(next_state, next_action_mask)
+            td_target = normalized_reward + gamma * best_next_q
         
         td_error = td_target - self.get_value(state, action)
+        update_value = alpha * td_error
 
-        self.q_table[state][action] += alpha * td_error
-
-"""
-correct: 
-Stepping environment with actions: {'red': array([346])}
-Stepping environment with actions: {'red': array([219])}
-
-incorrect:
-Stepping environment with actions: {'red': array(0)}
-""" 
+        self.q_table[state][action] += update_value
+        return float(update_value)
+        # q(s,a) = q(s,a) + alpha(R + gamma maxq(nexts,a) - q(s,a))
+        # q(s,a) = q(s,a) + alpha * td_error
+        # der td_error = td_target - get_value(s,a)
+        # og td_target = R + gamma * best_next_q
