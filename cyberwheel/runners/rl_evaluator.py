@@ -109,6 +109,7 @@ class RLEvaluator(RLTrainer):
                 save_dict = torch.load(
                                 files(f"cyberwheel.data.models.{self.args.experiment_name}").joinpath(agent_filename),
                                 map_location=self.device,
+                                weights_only=False,
                             )
                 # Restore Q-table
                 q_table_dict = save_dict['q_table']
