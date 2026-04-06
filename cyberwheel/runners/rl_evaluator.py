@@ -7,7 +7,7 @@ import time
 import importlib
 import pandas as pd
 import torch
-import wandb
+# import wandb
 import os
 import random
 import yaml
@@ -26,11 +26,11 @@ from cyberwheel.utils.set_seed import set_seed
 class RLEvaluator(RLTrainer):
     def __init__(self, args):
         super().__init__(args)
-        if self.args.download_model:
-            self.api = wandb.Api()
-            self.run = self.api.run(
-                f"{self.args.wandb_entity}/{self.args.wandb_project_name}/runs/{self.args.run}"
-            )
+        # if self.args.download_model:
+        #     self.api = wandb.Api()
+        #     self.run = self.api.run(
+        #         f"{self.args.wandb_entity}/{self.args.wandb_project_name}/runs/{self.args.run}"
+        #     )
 
     def configure_evaluation(self):
         if self.args.deterministic:
