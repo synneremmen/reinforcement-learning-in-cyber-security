@@ -13,12 +13,13 @@ debug_mode: false
 epsilon: 0.2
 decay_epsilon: false
 alpha: 0.1
+drive: true
 
 # Environment Parameters
 environment: CyberwheelRL # Environment class to use
 network_config: # List of network configuration filenames in config/network, if none: generate randomly
-  #- 6-host-network.yaml 
-#  - 15-host-network.yaml 
+  #  - 6-host-network.yaml 
+  #  - 15-host-network.yaml 
   # - 25-host-network.yaml
   # - 50-host-network.yaml
 host_config: host_defs_services.yaml # Host configuration filename in config/host_definitions

@@ -224,6 +224,22 @@ class RLTableHandler:
         pass
 
     def save_models(self):
+        if self.args.drive:
+            from google.colab import files as colab_files
+            import shutil
+            from pathlib import Path
+
+            models_path = "/content/reinforcement-learning-in-cyber-security/cyberwheel/data/models"
+            runs_path = "/content/reinforcement-learning-in-cyber-security/cyberwheel/data/runs"
+            for path in [models_path, runs_path]:
+                if os.path.exists(path):
+                    run_dir = Path(models_path)
+                    archive_base = str(run_dir)
+                    zip_file = shutil.make_archive(archive_base, "zip", root_dir=run_dir)
+                    colab_files.download(zip_file)
+                    print(f"Started download: {zip_file}")
+            print("Models saved to Google Drive and download initiated.")
+        
         run_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
         agent_paths = {}
         if not os.path.exists(run_path):
