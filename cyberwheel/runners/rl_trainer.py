@@ -136,7 +136,7 @@ class RLTrainer:
     def run_evals(self, models, globalstep):
         """Evaluate 'model' on tasks listed in 'eval_queue' in a separate process"""
         eval_device = torch.device("cpu")
-        loaded_models = {agent: torch.load(models[agent], map_location=eval_device) for agent in self.agents}
+        loaded_models = {agent: torch.load(models[agent], map_location=eval_device, weights_only=False) for agent in self.agents}
         eval_agents = {}
 
         results = {}
@@ -231,7 +231,7 @@ class RLTrainer:
                 t = "table"
             else: 
                 t = ""
-            network_files = generate_random_networks(n_networks=self.args.num_envs, output_path="cyberwheel/data/configs/network", t=t)
+            network_files = generate_random_networks(n_networks=self.args.num_envs, name=self.args.experiment_name, output_path="cyberwheel/data/configs/network", t=t)
             for i, net_file in enumerate(network_files):
                 network = Network.create_network_from_yaml(net_file)
                 network_name = network.name

@@ -185,7 +185,7 @@ class RandomNetworkGenerator:
         return f"{output_path}/{network.file_name}.yaml"
 
 
-def generate_random_networks(n_networks=10, output_path="cyberwheel/data/configs/network", seed=None, t=""):
+def generate_random_networks(n_networks=10, name=None, output_path="cyberwheel/data/configs/network", seed=None, t=""):
     """
     Generate multiple random network configurations.
     
@@ -208,12 +208,11 @@ def generate_random_networks(n_networks=10, output_path="cyberwheel/data/configs
             num_subnets = (2, random.randint(3, 6))
             hosts_per_subnet = (3, random.randint(5, 12))
         # print(f"Generating network {i+1}/{n_networks} with num_subnets={num_subnets} and hosts_per_subnet={hosts_per_subnet}")
-        i = 1
         file_path = generator.generate_and_save(
             output_path=output_path,
             num_subnets=num_subnets,
             hosts_per_subnet=hosts_per_subnet,
-            network_name=f"random-network-{i:03d}"
+            network_name=f"{name}-random-network-{i:03d}" if name else f"random-network-{i:03d}"
         )
         files.append(file_path)
     
