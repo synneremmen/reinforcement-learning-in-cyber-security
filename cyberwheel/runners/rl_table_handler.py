@@ -224,12 +224,6 @@ class RLTableHandler:
         pass
 
     def save_models(self):
-        if self.args.drive:
-            from pathlib import Path
-            drive_dir = Path("/content/drive/MyDrive/RLCSModels")
-            drive_dir.mkdir(parents=True, exist_ok=True)
-            torch.save(save_dict, drive_dir / "red_agent.pt")
-            print("Models saved to Google Drive and download initiated.")
         
         run_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
         agent_paths = {}
@@ -246,6 +240,12 @@ class RLTableHandler:
                 'global_step': self.global_step,
                 'num_states': len(q_table_dict),
             }
+            if self.args.drive:
+                from pathlib import Path
+                drive_dir = Path("/content/drive/MyDrive/RLCSModels")
+                drive_dir.mkdir(parents=True, exist_ok=True)
+                torch.save(save_dict, drive_dir / "red_agent.pt")
+                print("Models saved to Google Drive and download initiated.")
             
             torch.save(save_dict, agent_path)
             torch.save(save_dict, globalstep_path)
