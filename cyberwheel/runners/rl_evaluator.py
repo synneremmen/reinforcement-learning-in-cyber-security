@@ -1,5 +1,6 @@
 
 from collections import defaultdict
+from cyberwheel.network.network_generation.test_random_network_generator import generate_random_networks
 from cyberwheel.utils.rl_policy import RLPolicyTableBased
 import gymnasium as gym
 import time
@@ -36,7 +37,8 @@ class RLEvaluator(RLTrainer):
             set_seed(self.seed)
             torch.backends.cudnn.deterministic = True
         else:
-            set_seed(random.randint(0, 999999999))
+            seed = random.randint(0, 999999999)
+            set_seed(seed)
             torch.backends.cudnn.deterministic = False
 
         self.device = torch.device("cpu")
@@ -44,18 +46,27 @@ class RLEvaluator(RLTrainer):
 
         # Load networks from yaml here
         network_configs = []
-        if isinstance(self.args.network_config, str):
+        if self.args.network_config is None:
+            if self.args.policy_type == "table_based":
+                t = "table"
+            else: 
+                t = ""
+
+            network_configs = generate_random_networks(n_networks=1, output_path="cyberwheel/data/configs/network", seed=self.args.seed if self.args.deterministic else None, t=t)
+        elif isinstance(self.args.network_config, str):
             network_configs.append(self.args.network_config)
         else:
             for config in self.args.network_config:
                 network_configs.append(config)
         
         self.networks = {}
+        print("Network configs to evaluate:", network_configs)
         self.args.service_mapping = {}
         for config in network_configs:
-            network_config = files("cyberwheel.data.configs.network").joinpath(
-                config
-            )
+            if config.startswith("/") or config.startswith("cyberwheel"):
+                network_config = config
+            else:
+                network_config = files("cyberwheel.data.configs.network").joinpath(config)
 
             print(f"Building network: {config} ...")
 
@@ -115,6 +126,7 @@ class RLEvaluator(RLTrainer):
                     )
                 )
                 self.policy[agent].eval()
+        print("Models loaded for agents:", self.policy.keys())
 
     def _initialize_environment(self):
         print("Resetting the environment...")
@@ -166,6 +178,25 @@ class RLEvaluator(RLTrainer):
             self.action_mask[agent] = torch.zeros(self.agents[agent]["max_action_space_size"], dtype=torch.bool).to(self.device)
             self.rewards[agent] = [0] * self.args.num_episodes
 
+        # Get valid targets that will give rewards when impacted
+        valid_targets = self.env.reward_calculator.get_valid_targets()
+        print("\n=== Valid Target Hosts (will give reward when impacted) ===")
+        print(f"Total valid targets: {len(valid_targets)}")
+        network = self.env.network
+        for host_name in sorted(valid_targets):
+            if host_name in network.hosts:
+                host = network.hosts[host_name]
+                host_type = host.host_type.name if hasattr(host, 'host_type') and hasattr(host.host_type, 'name') else "Unknown"
+                is_decoy = " [DECOY]" if host.decoy else ""
+                print(f"  - {host_name} ({host_type}){is_decoy}")
+            else:
+                # Might be a decoy or other target not in regular hosts
+                print(f"  - {host_name} (not in network.hosts)")
+        print()
+        
+        # Track impacted hosts across all episodes
+        self.impacted_hosts = set()
+        
         self.start_time = time.time()
         for episode in range(self.args.num_episodes):
             obs, _ = self.env.reset()
@@ -182,6 +213,12 @@ class RLEvaluator(RLTrainer):
                     actions[agent] = action
 
                 obs, rew, done, _, info = self.env.step(actions)
+
+                # Track which hosts are impacted
+                if "host_info" in info:
+                    for host_name, host_view in info["host_info"].items():
+                        if host_view.get("impacted", False):
+                            self.impacted_hosts.add(host_name)
 
                 actions_df = {
                     "episode": episode,
@@ -207,6 +244,45 @@ class RLEvaluator(RLTrainer):
                     self.visualizer.visualize(episode, step, info)
                     # visualize(net, episode, step, now_str, history, killchain)
                 #return # TODO
+        
+        print("\n=== Evaluation Complete ===")
+        print(f"Total valid target hosts impacted: {len(self.impacted_hosts & valid_targets)}/{len(valid_targets)}")
+        print(f"Total other hosts impacted: {len(self.impacted_hosts - valid_targets)}")
+        
+        network = self.env.network
+        if self.impacted_hosts & valid_targets:
+            print("\nValid target hosts that were impacted:")
+            for host_name in sorted(self.impacted_hosts & valid_targets):
+                if host_name in network.hosts:
+                    host = network.hosts[host_name]
+                    host_type = host.host_type.name if hasattr(host, 'host_type') and hasattr(host.host_type, 'name') else "Unknown"
+                    is_decoy = " [DECOY]" if host.decoy else ""
+                    print(f"  - {host_name} ({host_type}){is_decoy}")
+                else:
+                    print(f"  - {host_name} (not in network.hosts)")
+        
+        not_impacted = valid_targets - self.impacted_hosts
+        if not_impacted:
+            print("\nValid target hosts NOT impacted:")
+            for host_name in sorted(not_impacted):
+                if host_name in network.hosts:
+                    host = network.hosts[host_name]
+                    host_type = host.host_type.name if hasattr(host, 'host_type') and hasattr(host.host_type, 'name') else "Unknown"
+                    is_decoy = " [DECOY]" if host.decoy else ""
+                    print(f"  - {host_name} ({host_type}){is_decoy}")
+                else:
+                    print(f"  - {host_name} (not in network.hosts)")
+        
+        other_impacted = self.impacted_hosts - valid_targets
+        if other_impacted:
+            print("\nOther hosts impacted (no reward):")
+            for host_name in sorted(other_impacted):
+                if host_name in network.hosts:
+                    host = network.hosts[host_name]
+                    host_type = host.host_type.name if hasattr(host, 'host_type') and hasattr(host.host_type, 'name') else "Unknown"
+                    print(f"  - {host_name} ({host_type})")
+                else:
+                    print(f"  - {host_name} (not in network.hosts)")
 
 """
     def evaluate(self):
