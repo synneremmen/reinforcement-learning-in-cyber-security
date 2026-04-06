@@ -1,7 +1,7 @@
 # Training Parameters
-experiment_name: TableRLRedAgentvsRLBlueAgent #TrainRedAgent_TwoLRs_AnnealonUpdate_BothHigh_ActionMask #EmulatorIntegrationCampaign_FixedTypeObs
+experiment_name: TableRLComplexRedAgentvsRLBlueAgent #TrainRedAgent_TwoLRs_AnnealonUpdate_BothHigh_ActionMask #EmulatorIntegrationCampaign_FixedTypeObs
 deterministic: true # Whether or not the training is deterministic
-seed: 1001
+seed: 42
 device: mps # Which device to train on
 async_env: false # Whether to run the environments in parallel
 total_timesteps: 10000000 # Total number of steps to run throughout training
@@ -17,7 +17,7 @@ alpha: 0.1
 # Environment Parameters
 environment: CyberwheelRL # Environment class to use
 network_config: # List of network configuration filenames in config/network, if none: generate randomly
-#  - 6-host-network.yaml 
+  #- 6-host-network.yaml 
 #  - 15-host-network.yaml 
   # - 25-host-network.yaml
   # - 50-host-network.yaml
@@ -30,7 +30,7 @@ agents:
   # red: rl_red_campaign.yaml
   # red: rl_red_agent.yaml
   # red: rl_red_complex.yaml
-  red: rl_red_agent.yaml
+  red: rl_red_complex.yaml
 policy_type: table_based # actor_critic
 
 valid_targets: servers
