@@ -59,14 +59,14 @@ class CyberwheelRL(gym.Env, Cyberwheel):
     
     def initialize_agents(self) -> None:
         max_net = self.args.network_size_compatibility
-        self.args.max_num_hosts = 10 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
+        self.args.max_num_hosts = 6 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
         self.args.max_num_subnets = 5 if max_net == 'small' else 100 if max_net == 'medium' else 1000 #if max_net == 'large'
 
         self.blue_agent = getattr(blue_agents, self.args.agent_config["blue"]["class"])(network=self.network, args=self.args)
         self.red_agent = getattr(red_agents, self.args.agent_config["red"]["class"])(network=self.network, args=self.args)
 
         self.blue_max_action_space_size = self.args.max_num_subnets * self.blue_agent.action_space.num_actions if self.args.agent_config["blue"]["rl"] else None #self.blue_agent.action_space._action_space_size if self.args.agent_config["blue"]["rl"] else None
-        self.red_max_action_space_size = self.args.max_num_hosts * 2 * self.red_agent.action_space.num_actions if self.args.agent_config["red"]["rl"] else None
+        self.red_max_action_space_size = self.args.max_num_hosts * self.red_agent.action_space.num_actions + 1 if self.args.agent_config["red"]["rl"] else None
 
         self.max_blue_attr_value = self.args.max_decoys + 2 if self.args.agent_config["blue"]["rl"] else None # Max obs attribute is limited to when num_decoys_deployed exceeds max_decoys allowed
         self.max_red_attr_value = 4 if self.args.agent_config["red"]["rl"] else None # Max obs attribute is limited to the 'quadrant' attribute, which goes up to 4.
@@ -119,19 +119,29 @@ class CyberwheelRL(gym.Env, Cyberwheel):
         done = self.current_step == self.max_steps - 1        
 
         self.current_step += 1
+        valid_targets = self.reward_calculator.get_valid_targets()
+        red_target_name = red_agent_result.target_host.name if red_agent_result.target_host != "invalid" else "invalid"
+        red_target_valid = red_target_name in valid_targets if red_target_name != "invalid" else False
+        red_action_name = red_agent_result.action.get_name()
+        red_kill_chain_phases = getattr(red_agent_result.action, "kill_chain_phases", [])
         info = {
             "red_reward": red_reward,
             "blue_reward": blue_reward,
+            "red_action": red_action_name,
+            "red_action_success": red_agent_result.success,
+            "red_target_valid": red_target_valid,
+            "red_kill_chain_phases": red_kill_chain_phases,
             }
         
         if self.evaluation:
             tgt_decoy = red_agent_result.target_host.decoy if red_agent_result.target_host != "invalid" else False
             decoy_attacked = red_agent_result.success and (tgt_decoy or red_agent_result.src_host.decoy)
             info = {
-                "red_action": red_agent_result.action.get_name(),
+                "red_action": red_action_name,
                 "red_action_src": red_agent_result.src_host.name,
                 "red_action_dst": red_agent_result.target_host.name if red_agent_result.target_host != "invalid" else "invalid",
                 "red_action_success": red_agent_result.success,
+                "red_target_valid": red_target_valid,
                 "blue_action": blue_agent_result.name,
                 "blue_action_id": blue_agent_result.id,
                 "blue_action_target": blue_agent_result.target,
@@ -142,7 +152,7 @@ class CyberwheelRL(gym.Env, Cyberwheel):
                 "network": self.network,
                 "history": self.red_agent.history,
                 "host_info": getattr(self.red_agent, "observation", None).obs if hasattr(self.red_agent, "observation") else None,
-                "commands": [], #red_agent_result.action_results.metadata.get("commands", []),
+                "commands": red_agent_result.action_results.metadata.get("commands", []), #red_agent_result.action_results.metadata.get("commands", []),
                 "decoy_attacked": decoy_attacked,
                 "red_reward": red_reward,
                 "blue_reward": blue_reward,
