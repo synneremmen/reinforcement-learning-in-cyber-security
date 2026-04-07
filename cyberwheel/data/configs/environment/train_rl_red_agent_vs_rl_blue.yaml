@@ -4,8 +4,8 @@ deterministic: true # Whether or not the training is deterministic
 seed: 1001
 device: cpu # Which device to train on
 async_env: false # Whether to run the environments in parallel
-total_timesteps: 1000000 # Total number of steps to run throughout training
-num_saves: 10 # Number of times the model is evaluated and saved during the training run
+total_timesteps: 10000000 # Total number of steps to run throughout training
+num_saves: 20 # Number of times the model is evaluated and saved during the training run
 num_envs: 1 # Number of game environments to run at once (parallel if async_env == true)
 num_steps: 30 # Number of steps to run per episode
 eval_episodes: 5 # Number of episodes to run in an evaluation
