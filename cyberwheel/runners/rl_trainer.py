@@ -6,10 +6,12 @@ from gymnasium import spaces
 import time
 import os
 import importlib
+import shutil
 import numpy as np
 import yaml
 
 from copy import deepcopy
+from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 from torch import optim, nn
 from importlib.resources import files
@@ -178,15 +180,28 @@ class RLTrainer:
         
         self.run.define_metric("episodic_runtime", summary="mean")
 
+    def sync_run_logs_to_drive(self):
+        if not getattr(self.args, "drive", False):
+            return
+        if not hasattr(self, "drive_run_dir") or self.drive_run_dir is None:
+            return
+
+        self.writer.flush()
+        shutil.copytree(self.run_dir, self.drive_run_dir, dirs_exist_ok=True)
+
     def configure_training(self):
-        self.writer = SummaryWriter(
-            files("cyberwheel.data.runs").joinpath(self.args.experiment_name)
-        )  # Logs data to tensorboard and W&B
+        self.run_dir = Path(str(files("cyberwheel.data.runs").joinpath(self.args.experiment_name)))
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        self.writer = SummaryWriter(str(self.run_dir))  # Logs data to tensorboard and W&B
         self.writer.add_text(
             "hyperparameters",
             "|param|value|\n|-|-|\n%s"
             % ("\n".join([f"|{key}|{value}|" for key, value in vars(self.args).items()])),
         )
+        self.drive_run_dir = None
+        if getattr(self.args, "drive", False):
+            self.drive_run_dir = Path("/content/drive/MyDrive/RLCS/runs") / self.args.experiment_name
+            self.drive_run_dir.mkdir(parents=True, exist_ok=True)
         # Seeding
         if self.args.deterministic:
             set_seed(self.seed)
@@ -352,7 +367,7 @@ class RLTrainer:
         self.handler.calculate_explained_variance()
 
         # Infrequently save the model and evaluate the agent
-        if (update - 1) % self.args.save_frequency == 0:
+        if self.args.save_frequency > 0 and (update - 1) % self.args.save_frequency == 0:
             start_eval = time.time()
             start_process_eval = time.process_time()
 
@@ -372,29 +387,9 @@ class RLTrainer:
                 median_decoys_attacked = median(self.episode_decoy_attacks)
                 mean_decoys_deployed = mean(self.episode_decoys_deployed)
                 median_decoys_deployed = median(self.episode_decoys_deployed)
-                self.writer.add_scalar(
-                    f"evaluation/{network_name}_mean_decoys_attacked",
-                    mean_decoys_attacked,
-                    self.handler.global_step,
-                )
-                self.writer.add_scalar(
-                    f"evaluation/{network_name}_median_decoys_attacked",
-                    median_decoys_attacked,
-                    self.handler.global_step,
-                )
-                self.writer.add_scalar(
-                    f"evaluation/{network_name}_mean_decoys_deployed",
-                    mean_decoys_deployed,
-                    self.handler.global_step
-                )
-                self.writer.add_scalar(
-                    f"evaluation/{network_name}_median_decoys_deployed",
-                    median_decoys_deployed,
-                    self.handler.global_step
-                )
                 for agent in self.agents:
                     self.writer.add_scalar(
-                        f"evaluation/{network_name}_blue_episodic_return",
+                        f"evaluation/{network_name}_episodic_return",
                         eval_return[network_name][agent],
                         self.handler.global_step,
                     )
@@ -411,7 +406,11 @@ class RLTrainer:
         
         self.handler.log_training_metrics(self.writer)
 
+        if self.args.save_frequency > 0 and (update - 1) % self.args.save_frequency == 0:
+            self.sync_run_logs_to_drive()
+
 
     def close(self) -> None:
         self.envs.close()
+        self.sync_run_logs_to_drive()
         self.writer.close()

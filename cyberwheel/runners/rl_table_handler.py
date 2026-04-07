@@ -3,7 +3,6 @@ from torch import nn, optim
 
 from cyberwheel.utils import RLPolicyTableBased
 from gymnasium.vector import VectorEnv, AsyncVectorEnv
-from torch.utils.tensorboard import SummaryWriter
 
 from importlib.resources import files
 from pathlib import Path
@@ -241,16 +240,12 @@ class RLTableHandler:
                 'global_step': self.global_step,
                 'num_states': len(q_table_dict),
             }
-            if self.args.drive:
+            if getattr(self.args, "drive", False):
                 drive_model_dir = Path("/content/drive/MyDrive/RLCS/model/" + self.args.experiment_name)
                 drive_model_dir.mkdir(parents=True, exist_ok=True)
                 torch.save(save_dict, drive_model_dir / f"{agent}_agent.pt")
                 torch.save(save_dict, drive_model_dir / f"{agent}_{self.global_step}.pt")
-                print("Models saved to Google Drive and download initiated.")
-                drive_run_dir = Path("/content/drive/MyDrive/RLCS/runs/" + self.args.experiment_name)
-                drive_run_dir.mkdir(parents=True, exist_ok=True)
-                self.writer = SummaryWriter(str(drive_run_dir))
-                print("Runs saved to Google Drive.")
+                print("Models saved to Google Drive.")
             
             torch.save(save_dict, agent_path)
             torch.save(save_dict, globalstep_path)
