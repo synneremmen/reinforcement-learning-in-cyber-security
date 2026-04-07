@@ -242,9 +242,10 @@ class RLTableHandler:
             }
             if self.args.drive:
                 from pathlib import Path
-                drive_dir = Path("/content/drive/MyDrive/RLCSModels")
+                drive_dir = Path("/content/drive/MyDrive/RLCSModels"+self.args.experiment_name)
                 drive_dir.mkdir(parents=True, exist_ok=True)
-                torch.save(save_dict, drive_dir / "red_agent.pt")
+                torch.save(save_dict, drive_dir / f"{agent}_agent.pt")
+                torch.save(save_dict, drive_dir / f"{agent}_{self.global_step}.pt")
                 print("Models saved to Google Drive and download initiated.")
             
             torch.save(save_dict, agent_path)
