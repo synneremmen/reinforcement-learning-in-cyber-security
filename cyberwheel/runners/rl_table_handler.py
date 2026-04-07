@@ -3,6 +3,7 @@ from torch import nn, optim
 
 from cyberwheel.utils import RLPolicyTableBased
 from gymnasium.vector import VectorEnv, AsyncVectorEnv
+from torch.utils.tensorboard import SummaryWriter
 
 from importlib.resources import files
 from pathlib import Path
