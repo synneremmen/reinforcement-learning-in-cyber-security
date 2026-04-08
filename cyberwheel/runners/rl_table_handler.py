@@ -193,7 +193,7 @@ class RLTableHandler:
             if getattr(self.args, "drive", False):
                 drive_model_dir = Path("/content/drive/MyDrive/RLCS/model/" + self.args.experiment_name)
                 drive_model_dir.mkdir(parents=True, exist_ok=True)
-                with open('/content/drive/MyDrive/RLCS/step.txt', 'w') as f:
+                with open(f'/content/drive/MyDrive/RLCS/{self.args.experiment_name}_step.txt', 'w') as f:
                     f.write("Global step: " + str(self.global_step) + ", Episode: " + str(self.episode))
                 print("Global step: " + str(self.global_step) + ", Episode: " + str(self.episode))
 
