@@ -186,14 +186,19 @@ class RLTableHandler:
     def flatten_batch(self):
         pass
 
-    def update_policy(self, step = None):
+    def update_policy(self):
         """Update Q-tables using collected transitions (offline learning)"""
     
         for agent in self.agents:
+            if getattr(self.args, "drive", False):
+                drive_model_dir = Path("/content/drive/MyDrive/RLCS/model/" + self.args.experiment_name)
+                drive_model_dir.mkdir(parents=True, exist_ok=True)
+                with open('../drive/MyDrive/RLCS/step.txt', 'w') as f:
+                    f.write("Global step: " + str(self.global_step) + ", Episode: " + str(self.episode))
+                print("Models saved to Google Drive.")
+
             td_updates = []
             for step in range(self.args.num_steps):
-                if step % 1000 == 0:
-                    print(f"Step {step}")
                 for env_idx in range(self.args.num_envs):
 
                     # Update Q-table
