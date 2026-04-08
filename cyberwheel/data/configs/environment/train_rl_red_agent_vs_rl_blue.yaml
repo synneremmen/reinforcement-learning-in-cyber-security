@@ -2,7 +2,7 @@
 experiment_name: TableRLRedAgentvsRLBlueAgent #TrainRedAgent_TwoLRs_AnnealonUpdate_BothHigh_ActionMask #EmulatorIntegrationCampaign_FixedTypeObs
 deterministic: true # Whether or not the training is deterministic
 seed: 1001
-device: cpu # Which device to train on
+device: cuda # Which device to train on
 async_env: false # Whether to run the environments in parallel
 total_timesteps: 10000000 # Total number of steps to run throughout training
 num_saves: 20 # Number of times the model is evaluated and saved during the training run
