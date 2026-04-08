@@ -195,7 +195,7 @@ class RLTableHandler:
                 drive_model_dir.mkdir(parents=True, exist_ok=True)
                 with open('../drive/MyDrive/RLCS/step.txt', 'w') as f:
                     f.write("Global step: " + str(self.global_step) + ", Episode: " + str(self.episode))
-                print("Models saved to Google Drive.")
+                print("Global step: " + str(self.global_step) + ", Episode: " + str(self.episode))
 
             td_updates = []
             for step in range(self.args.num_steps):
