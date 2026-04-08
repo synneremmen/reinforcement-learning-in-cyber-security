@@ -137,7 +137,7 @@ class RLTrainer:
     
     def run_evals(self, models, globalstep):
         """Evaluate 'model' on tasks listed in 'eval_queue' in a separate process"""
-        eval_device = torch.device("cpu")
+        eval_device = self.args.device
         loaded_models = {agent: torch.load(models[agent], map_location=eval_device, weights_only=False) for agent in self.agents}
         eval_agents = {}
 
@@ -149,7 +149,7 @@ class RLTrainer:
                 # Load the agent
 
                 if isinstance(self.handler, RLTableHandler):
-                    eval_agent = RLPolicyTableBased(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"]).to(eval_device)
+                    eval_agent = RLPolicyTableBased(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"], device=eval_device)
                     eval_agent.q_table = loaded_models[agent]
                 else:
                     eval_agent = RLPolicyActorCritic(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"]).to(eval_device)

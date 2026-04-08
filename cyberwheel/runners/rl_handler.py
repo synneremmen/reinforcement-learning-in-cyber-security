@@ -29,7 +29,7 @@ class RLHandler:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
             if self.args.policy_type == "table_based":
-                self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"]).to(self.device)
+                self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], device=self.device)
             else:
                 self.agents[agent]["policy"] = RLPolicyActorCritic(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"]).to(self.device)
                 self.agents[agent]["optimizer"] = optim.Adam([

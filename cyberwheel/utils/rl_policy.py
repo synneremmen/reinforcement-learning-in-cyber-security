@@ -68,31 +68,58 @@ class RLPolicyTableBased(nn.Module):
     """
     TODO: Add header
     """
-    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.1, num_hosts=6):
+    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.1, num_hosts=6, device="cpu"):
         super().__init__()
         obs_space_shape = int(np.array(obs_space_shape).prod())
         self.obs_space_shape = obs_space_shape
         self.action_space_shape = action_space_shape
         self.num_hosts = num_hosts # TODO: hardcoded, bad coding...
+        self.device = device
         # self.state_space = (1 + 3 * 2**6)**self.num_hosts
         # self.compressed_state_space = (1 + 3 * 2*4)**self.num_hosts # given that we compress the 7 host-level attributes to 3, and keep the global attribute, we get 1 + 3*6 possible combinations per host
         print(f"Using {self.num_hosts} hosts:")
         #print(f"Size of q_table: {self.compressed_state_space} x {self.action_space_shape} = {self.compressed_state_space * self.action_space_shape} entries")
-        self.q_table = defaultdict(lambda: torch.rand(self.action_space_shape))
+        self.q_table = defaultdict(self._new_q_values)
         # default to random values [0,1] to encourage exploration of unseen actions?
         print(f"Initialized Q-table with shape {len(self.q_table)} x {self.action_space_shape} = {len(self.q_table) * self.action_space_shape} entries")
         self.epsilon = epsilon
 
+    def to(self, *args, **kwargs):
+        module = super().to(*args, **kwargs)
+        device_arg = kwargs.get("device", None)
+        if device_arg is None and len(args) > 0 and isinstance(args[0], (str, torch.device)):
+            device_arg = args[0]
+        if device_arg is not None:
+            self.device = torch.device(device_arg)
+            for state, q_values in list(self.q_table.items()):
+                self.q_table[state] = q_values.to(self.device)
+        return module
+
+    def _new_q_values(self):
+        return torch.zeros(self.action_space_shape, device=self.device)
+
+    def _get_state_q(self, state):
+        q_values = self.q_table.get(state)
+        if q_values is None:
+            q_values = self._new_q_values()
+            self.q_table[state] = q_values
+        elif q_values.device != self.device:
+            q_values = q_values.to(self.device)
+            self.q_table[state] = q_values
+        return q_values
+
     def obs_to_state(self, obs):
+        obs_tensor = torch.as_tensor(obs, device=self.device)
+        if obs_tensor.ndim > 1:
+            obs_tensor = obs_tensor.reshape(-1)
+
         state = []
-        if obs.ndim == 1:
-            obs = obs[np.newaxis, :]  
-        global_att = obs[:,-1] 
-        host_obs = obs[:,:self.obs_space_shape - 1] 
-        host_obs = host_obs.reshape(self.num_hosts, -1)[:,:8]
+        global_att = int(obs_tensor[-1].item())
+        host_obs = obs_tensor[: self.obs_space_shape - 1]
+        host_obs = host_obs.reshape(self.num_hosts, -1)[:, :8]
         for host_idx in range(self.num_hosts):
             host_features = host_obs[host_idx]
-            type_, sweeped, scanned, discovered, on_host, escalated, impacted = host_features # , visited
+            type_, sweeped, scanned, discovered, on_host, escalated, impacted = [int(v.item()) for v in host_features[:7]]
             
             if impacted == 1:
                 curr = 4
@@ -107,9 +134,9 @@ class RLPolicyTableBased(nn.Module):
             else:
                 curr = -1
 
-            state.append([int(type_), int(on_host), int(curr)])
-        state = np.array(state).flatten()
-        state = np.concatenate([state, global_att])
+            state.extend([type_, int(on_host), int(curr)])
+
+        state.append(global_att)
         return tuple(state)
         
     def get_action_and_value(self, obs, action=None, action_mask=None):
@@ -120,23 +147,20 @@ class RLPolicyTableBased(nn.Module):
         return action, value , None, None
         
     def get_value(self, state, action): # best action value for a given state
-        return self.q_table[state][action].item() 
+        return self._get_state_q(state)[int(action)].item() 
     
     def get_best_value(self, state, action_mask=None):
+        q_values = self._get_state_q(state)
         if action_mask is not None:
-            q_values = self.q_table[state].clone()
-            # q_values[~torch.tensor(action_mask, dtype=torch.bool)] = float("-inf")
+            q_values = q_values.clone()
             q_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)] = float("-inf")
             best_value = torch.max(q_values).item()
         else:
-            best_value = torch.max(self.q_table[state]).item()
+            best_value = torch.max(q_values).item()
         return best_value
     
     def greedy_action(self, state, action_mask=None):
-        # action_values = self.q_table[state]
-        action_values = self.q_table.setdefault(
-        state, torch.rand(self.action_space_shape) 
-        )
+        action_values = self._get_state_q(state)
         if action_mask is not None:
             action_values = action_values.clone()
             action_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=action_values.device)] = float("-inf")
@@ -146,14 +170,16 @@ class RLPolicyTableBased(nn.Module):
     def select_action(self, obs, action_mask):
         """Select action using epsilon-greedy with action mask"""
         state = self.obs_to_state(obs)
+        mask = torch.as_tensor(action_mask, dtype=torch.bool, device=self.device)
         if np.random.uniform() < self.epsilon:
-            valid_actions = torch.where(action_mask)[0]
+            valid_actions = torch.where(mask)[0]
             if len(valid_actions) > 0:
-                return np.random.choice(valid_actions.cpu().numpy())
+                random_idx = torch.randint(0, len(valid_actions), (1,), device=self.device)
+                return int(valid_actions[random_idx].item())
             else:
                 return 0
         else:
-            return self.greedy_action(state, action_mask)
+            return self.greedy_action(state, mask)
 
     def normalize_reward(self, reward):
         # min_v = -10 # worst reward
@@ -166,7 +192,9 @@ class RLPolicyTableBased(nn.Module):
         """Update Q-table using Q-learning update rule"""
         state = self.obs_to_state(obs)
         next_state = self.obs_to_state(next_obs)
-        normalized_reward = self.normalize_reward(reward)
+        normalized_reward = float(self.normalize_reward(float(torch.as_tensor(reward).item())))
+        done = bool(torch.as_tensor(done).item())
+        action_idx = int(torch.as_tensor(action).item())
     
         if done:
             td_target = normalized_reward
@@ -174,10 +202,10 @@ class RLPolicyTableBased(nn.Module):
             best_next_q = self.get_best_value(next_state, next_action_mask)
             td_target = normalized_reward + gamma * best_next_q
         
-        td_error = td_target - self.get_value(state, action)
+        td_error = td_target - self.get_value(state, action_idx)
         update_value = alpha * td_error
 
-        self.q_table[state][action] += update_value
+        self._get_state_q(state)[action_idx] += update_value
         return float(update_value)
         # q(s,a) = q(s,a) + alpha(R + gamma maxq(nexts,a) - q(s,a))
         # q(s,a) = q(s,a) + alpha * td_error

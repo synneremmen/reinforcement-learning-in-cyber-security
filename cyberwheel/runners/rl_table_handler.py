@@ -28,7 +28,7 @@ class RLTableHandler:
         for agent in agents:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
-            self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], self.initial_epsilon).to(self.device)
+            self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], self.initial_epsilon, device=self.device)
 
         if self.load:
             print(self.args.experiment_name)
@@ -57,7 +57,7 @@ class RLTableHandler:
         for agent in self.agents:
             agent_dict = self.agents[agent]
             self.agents[agent]["obs"] = torch.zeros((self.args.num_steps, self.args.num_envs) + agent_dict["obs"].shape).to(self.device)
-            self.agents[agent]["actions"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
+            self.agents[agent]["actions"] = torch.zeros((self.args.num_steps, self.args.num_envs), dtype=torch.long).to(self.device)
             self.agents[agent]["action_masks"] = torch.zeros((self.args.num_steps, self.args.num_envs, agent_dict["max_action_space_size"]), dtype=torch.bool).to(self.device)
             self.agents[agent]["resets"] = np.array(reset[agent])
             self.agents[agent]["next_obs"] = torch.Tensor(self.agents[agent]["resets"]).to(self.device)
@@ -97,7 +97,7 @@ class RLTableHandler:
         for agent in self.agents:
             self.agents[agent]["obs"][step] = self.agents[agent]["next_obs"]
             for env_idx in range(self.args.num_envs):
-                obs = self.agents[agent]["obs"][step][env_idx].cpu().numpy()
+                obs = self.agents[agent]["obs"][step][env_idx]
                 action_mask = self.agents[agent]["action_masks"][step][env_idx]
                 # self.agents[agent]["values"][step][env_idx] = self.agents[agent]["policy"].get_value(obs, action_mask=action_mask).detach()
                 action = self.agents[agent]["policy"].select_action(
@@ -192,16 +192,18 @@ class RLTableHandler:
         for agent in self.agents:
             td_updates = []
             for step in range(self.args.num_steps):
+                if step % 1000 == 0:
+                    print(f"Step {step}")
                 for env_idx in range(self.args.num_envs):
 
                     # Update Q-table
                     update_value = self.agents[agent]["policy"].update_q_table(
-                        obs=self.agents[agent]["obs"][step][env_idx].cpu().numpy(),
-                        action=self.agents[agent]["actions"][step][env_idx].cpu().numpy(),
-                        reward=self.agents[agent]["rewards"][step][env_idx].cpu().numpy(),
-                        next_obs=self.agents[agent]["obs"][step + 1][env_idx].cpu().numpy() if step < self.args.num_steps - 1 else self.agents[agent]["next_obs"][env_idx].cpu().numpy(),
-                        done=self.dones[step][env_idx].cpu().numpy(),
-                        next_action_mask=self.agents[agent]["action_masks"][step + 1][env_idx].cpu().numpy() if step < self.args.num_steps - 1 else None,
+                        obs=self.agents[agent]["obs"][step][env_idx],
+                        action=self.agents[agent]["actions"][step][env_idx],
+                        reward=self.agents[agent]["rewards"][step][env_idx],
+                        next_obs=self.agents[agent]["obs"][step + 1][env_idx] if step < self.args.num_steps - 1 else self.agents[agent]["next_obs"][env_idx],
+                        done=self.dones[step][env_idx],
+                        next_action_mask=self.agents[agent]["action_masks"][step + 1][env_idx] if step < self.args.num_steps - 1 else None,
                         alpha=self.args.alpha,
                         gamma=self.args.gamma
                     )
@@ -271,7 +273,8 @@ class RLTableHandler:
                 self.agents[agent]["policy"].q_table = defaultdict(
                     lambda: torch.zeros(self.agents[agent]["policy"].action_space_shape)
                 )
-                self.agents[agent]["policy"].q_table.update(q_table_dict)
+                for state, q_values in q_table_dict.items():
+                    self.agents[agent]["policy"].q_table[state] = torch.as_tensor(q_values, device=self.device)
 
                 self.agents[agent]["policy"].epsilon = self.initial_epsilon
                 
