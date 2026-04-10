@@ -30,19 +30,19 @@ def train_table_agents(args: YAMLConfig):
 
     print("*** Abstract agent ***")
 
-    if args.load:
-        # can use model to train
-        print("Loading abstract agent...")
-        abstract_trainer.handler.load_models()
-    else:
-        # need to train a model
-        print("Training abstract agent...")
-        for update in range(1, args.num_updates + 1):
-            # update envs each training step if leader and entry host are random (initial method to test)
-            red_agent = abstract_trainer.handler.envs.envs[0].red_agent
-            if red_agent.leader == "random" and red_agent.entry_host == "random":
-                abstract_trainer.handler.envs = abstract_trainer.get_envs()  # reinitialize envs (entry host and leader will be reselected)
-            abstract_trainer.train(update)
+    # if args.load:
+    #     # can use model to train
+    #     print("Loading abstract agent...")
+    abstract_trainer.handler.load_models()
+    # else:
+    #     # need to train a model
+    #     print("Training abstract agent...")
+    #     for update in range(1, args.num_updates + 1):
+    #         # update envs each training step if leader and entry host are random (initial method to test)
+    #         red_agent = abstract_trainer.handler.envs.envs[0].red_agent
+    #         if red_agent.leader == "random" and red_agent.entry_host == "random":
+    #             abstract_trainer.handler.envs = abstract_trainer.get_envs()  # reinitialize envs (entry host and leader will be reselected)
+    #         abstract_trainer.train(update)
 
     abstract_policy = abstract_trainer.handler.agents["red"]["policy"]
     abstract_num_states = len(abstract_policy.q_table)

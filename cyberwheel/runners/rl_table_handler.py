@@ -267,12 +267,13 @@ class RLTableHandler:
     def load_models(self, name="red_agent"):
         """Load Q-tables from disk"""
         for agent in self.agents:
-            if self.args.driver:
+            if self.args.drive:
                 agent_path = Path("/content/drive/MyDrive/RLCS/model") / self.args.experiment_name / f"{name}.pt"
+                print(f"Loading {agent} agent from Google Drive path: {agent_path}")
             else:
                 agent_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name).joinpath(f"{name}.pt")
             if os.path.exists(agent_path):
-                save_dict = torch.load(agent_path)
+                save_dict = torch.load(agent_path, map_location=torch.device(self.device))
                 
                 # Restore Q-table
                 q_table_dict = save_dict['q_table']
