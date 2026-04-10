@@ -158,7 +158,8 @@ class NetworkYAMLGenerator():
         _none_to_dict(self.data, "interfaces")
         if src not in self.data["interfaces"]:
             self.data["interfaces"][src] = []
-        self.data["interfaces"][src].append(dest)
+        if dest not in self.data["interfaces"][src]:
+            self.data["interfaces"][src].append(dest)
 
     def _add_route(self, index: str, index2: str, dest: str, via: str):
         if not self.data[index]:
@@ -173,7 +174,7 @@ class NetworkYAMLGenerator():
         if name: 
             firewall_object["name"] = name
         if src: 
-            firewall_object["src"] = name
+            firewall_object["src"] = src
         if dest: 
             firewall_object["dest"] = dest
         if port: 

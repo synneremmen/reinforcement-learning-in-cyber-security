@@ -14,6 +14,7 @@ class RandomNetworkGenerator:
         self, 
         num_subnets=(3, 9),
         hosts_per_subnet=(3, 11),
+        max_cross_subnet_interfaces=2,
         host_types=None,
         network_name=None
     ):
@@ -91,7 +92,7 @@ class RandomNetworkGenerator:
             for j in range(n_hosts):
                 host_name = f"host_{host_id:03d}" # format: pad with leading zeros to ensure 3 digits
                 # host_type = self.rng.choice(host_types) # add probabilities?
-                host_type = self.rng.choices(host_types, weights=[0.15, 0.15, 0.15, 0.15, 0.15, 0.5], k=1)[0]
+                host_type = self.rng.choices(host_types, weights=[0.10, 0.10, 0.10, 0.10, 0.10, 0.5], k=1)[0]
                 # higher chance of workstation (user hosts), lower chance of proxy_server
                 
                 if j == n_hosts - 1:
@@ -131,42 +132,65 @@ class RandomNetworkGenerator:
             interfaces = network.data.get("interfaces") or {}
 
             def has_cross_subnet_interface() -> bool:
+                # Require at least one subnet pair with links in both directions:
+                # subnet_a -> subnet_b and subnet_b -> subnet_a (hosts can differ).
+                subnet_edges = set()
+
                 for src, dst_list in interfaces.items():
-                    src_subnet = network.data["hosts"].get(src, {}).get("subnet")
+                    src_subnet = network.data["hosts"].get(src, {}).get("subnet") # get subnet of source host
                     if not src_subnet:
                         continue
-                    for dst in dst_list:
-                        dst_subnet = network.data["hosts"].get(dst, {}).get("subnet")
-                        if dst_subnet and dst_subnet != src_subnet:
-                            return True
+                    for dst in dst_list: 
+                        dst_subnet = network.data["hosts"].get(dst, {}).get("subnet") # get subnet of destination host
+                        if dst_subnet and dst_subnet != src_subnet: # if not the same subnet
+                            subnet_edges.add((src_subnet, dst_subnet)) # add edge from src subnet to dst subnet
+
+                for subnet_a, subnet_b in subnet_edges: # if there is an edge from subnet_a to subnet_b, check if there is also an edge from subnet_b to subnet_a
+                    if (subnet_b, subnet_a) in subnet_edges:
+                        return True
                 return False
 
-            if not has_cross_subnet_interface():
+            cross_subnet_exists = has_cross_subnet_interface()
+            print("Checking for existing cross-subnet interfaces...", cross_subnet_exists)
+            print("Current interfaces:", interfaces)
+
+            if not cross_subnet_exists:
                 subnet_to_hosts = {}
                 for host_name, host_data in network.data["hosts"].items():
-                    subnet = host_data.get("subnet")
+                    subnet = host_data.get("subnet") # get subnet of host
                     if not subnet:
                         continue
-                    subnet_to_hosts.setdefault(subnet, []).append(host_name)
+                    if subnet not in subnet_to_hosts:
+                        subnet_to_hosts[subnet] = []
+                    subnet_to_hosts[subnet].append(host_name)
 
-                eligible_subnets = [s for s, hosts in subnet_to_hosts.items() if len(hosts) > 0]
-                if len(eligible_subnets) >= 2:
-                    candidates = []
-                    for i, subnet_a in enumerate(eligible_subnets):
-                        for subnet_b in eligible_subnets[i + 1:]:
-                            for host_a in subnet_to_hosts[subnet_a]:
-                                for host_b in subnet_to_hosts[subnet_b]:
-                                    candidates.append((host_a, host_b))
-
-                    self.rng.shuffle(candidates)
-                    for host_a, host_b in candidates:
-                        existing_a = interfaces.get(host_a, [])
-                        existing_b = interfaces.get(host_b, [])
-                        if host_b not in existing_a and host_a not in existing_b:
-                            network.interface(host_a, host_b)
+                eligible_subnet_hosts = {}
+                for subnet, hosts in subnet_to_hosts.items():
+                    print(f"Subnet {subnet} has hosts: {hosts}")
+                    eligible_subnet_hosts[subnet] = []
+                    for host in hosts:
+                        if host in interfaces.keys():
+                            print("Host with existing interface found for subnet", subnet, ":", host)
+                            eligible_subnet_hosts.pop(subnet, None) # only want subnets with no existing outgoing interfaces, so remove from eligible list if any host has an interface
                             break
-        
-        # print(f"Generated random network '{network_name}' with {n_subnets} subnets and {host_id} hosts.")
+                        eligible_subnet_hosts[subnet].append(host)
+
+                candidates = {} # get all possible pairs of hosts from different eligible subnets that could be connected
+                for i, subnet_a in enumerate(eligible_subnet_hosts.keys()): # for each subnet with no interface going out, find candidates
+                    hosts_src = eligible_subnet_hosts[subnet_a]
+                    for subnet_dst in [s for s in subnet_to_hosts.keys() if s != subnet_a and len(subnet_to_hosts.get(s, [])) > 0]: # for each other subnet that has hosts, find candidates
+                        hosts_dst = subnet_to_hosts[subnet_dst]
+                        if hosts_src and hosts_dst:
+                            candidates[subnet_a] = candidates.get(subnet_a, []) + [(host_src, host_dst) for host_src in hosts_src for host_dst in hosts_dst] # add pair of subnets to candidates list
+                candidate_subnets = list(candidates.keys())
+                self.rng.shuffle(candidate_subnets)
+                
+                for subnet in candidate_subnets:
+                    for i in range(self.rng.randint(1, min(max_cross_subnet_interfaces, len(candidates[subnet])))): # add 1-3 random interfaces between hosts in this subnet and hosts in other subnets
+                        host_a, host_b = self.rng.choice(candidates[subnet])
+                        network.interface(host_a, host_b)
+                # print("Updated interfaces:", network.data.get("interfaces"))
+        # print()
         return network
     
     def generate_and_save(self, output_path="cyberwheel/data/configs/network", **kwargs):
