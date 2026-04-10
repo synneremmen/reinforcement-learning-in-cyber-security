@@ -264,7 +264,7 @@ class RLTableHandler:
             agent_paths[agent] = agent_path
         return agent_paths
 
-    def load_models(self, name="red_3499890"):
+    def load_models(self, name="red_agent"):
         """Load Q-tables from disk"""
         for agent in self.agents:
             if self.args.drive:
