@@ -34,13 +34,15 @@ class RedObservation(Observation):
         self.attributes: dict[str, list[ObservationAttribute]] = {}
 
         self.attributes["host"] = [ # Define all host-level observations
-            ObservationAttribute("type", 'int'),
-            ObservationAttribute("sweeped", 'bool'),
-            ObservationAttribute("scanned", 'bool'),
-            ObservationAttribute("discovered", 'bool'),
-            ObservationAttribute("on_host", 'bool'),
-            ObservationAttribute("escalated", 'bool'),
-            ObservationAttribute("impacted", 'bool'),
+            ObservationAttribute("type", 'int'), # 0-6 (unknown, workstation, mail, file, web, sshjump, proxy)
+            # ObservationAttribute("sweeped", 'bool'),
+            # ObservationAttribute("scanned", 'bool'),
+            # ObservationAttribute("discovered", 'bool'),
+            ObservationAttribute("on_host", 'bool'), # 0 or 1
+            # ObservationAttribute("escalated", 'bool'),
+            # ObservationAttribute("impacted", 'bool'),
+            ObservationAttribute("phase", 'int'), # 0-4 (sweeped, scanned, discovered, escalated, impacted)
+            ObservationAttribute("visited", 'bool'), # 0-1
         ]
         self.attributes["subnet"] = [] # Define all subnet-level observations
         self.attributes["standalone"] = [ # Define all standalone observations

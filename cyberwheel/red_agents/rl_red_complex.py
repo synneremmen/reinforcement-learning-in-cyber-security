@@ -197,34 +197,25 @@ class RLComplexAgent(ARTAgent):
         host_view = self.observation.obs[target_host]
         # print("Host view:", host_view)
         if phase == "pingsweep":  # valid if host hasn't been sweeped
-            return not host_view["sweeped"]
+            return not host_view["phase"] >= 0
         elif phase == "portscan":  # valid if host hasn't been scanned and host has been sweeped
-            return host_view["sweeped"] and not host_view["scanned"]
+            return not host_view["phase"] >= 1
         elif phase == "discovery":  # valid if host has been scanned and sweeped but not discovered
-            return host_view["sweeped"] and host_view["scanned"] and not host_view["discovered"]
+            return not host_view["phase"] >= 2
         elif phase == "lateral-movement":  # valid if host has been scanned and sweeped and discovered but not on target
             return (
-                host_view["sweeped"]
-                and host_view["scanned"]
-                and host_view["discovered"]
+                host_view["phase"] >= 2
                 and not host_view["on_host"]
             )
         elif phase == "privilege-escalation":  # valid if host has been scanned and sweeped and discovered and on target but not escalated
             return (
-                host_view["sweeped"]
-                and host_view["scanned"]
-                and host_view["discovered"]
-                and host_view["on_host"]
-                and not host_view["escalated"]
+                host_view["on_host"]
+                and not host_view["phase"] >= 3
             )
         elif phase == "impact":  # valid if host has been scanned and sweeped and discovered and on target and escalated
             return (
-                host_view["sweeped"]
-                and host_view["scanned"]
-                and host_view["discovered"]
-                and host_view["on_host"]
-                and host_view["escalated"]
-                and not host_view["impacted"]
+                host_view["on_host"]
+                and not host_view["phase"] >= 4
             )
         else:
             return False

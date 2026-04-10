@@ -158,48 +158,40 @@ class RLARTAgent(ARTAgent):
     
 
     def validate_action(self, action: ARTKillChainPhase, target_host: str) -> bool:
+        # 0-4 (sweeped, scanned, discovered, escalated, impacted)
         if action == Nothing:
             return True
         host_view = self.observation.obs[target_host]
         if action == ARTPingSweep:  # valid if host["sweeped"] == False
-            return not host_view["sweeped"]
+            return not host_view["phase"] >= 0
         elif (
             action == ARTPortScan
         ):  # valid if host["scanned"] == False and host["sweeped"] == True
-            return host_view["sweeped"] and not host_view["scanned"]
+            return not host_view["phase"] >= 1
         elif (
             action == ARTDiscovery
         ):  # valid if host["scanned"] && host["sweeped"] && !host["discovered"]
-            return host_view["sweeped"] and host_view["scanned"] and not host_view["discovered"]
+            return not host_view["phase"] >= 2
         elif (
             action == ARTLateralMovement
         ):  # valid if host["scanned"] && host["sweeped"] && host["discovered"] && !host.on_target
             return (
-                host_view["sweeped"]
-                and host_view["scanned"]
-                and host_view["discovered"]
+                host_view["phase"] >= 2
                 and not host_view["on_host"]
             )
         elif (
             action == ARTPrivilegeEscalation
         ):  # valid if host["scanned"] && host["sweeped"] && host["discovered"] && host.on_target && !host["escalated"]
             return (
-                host_view["sweeped"]
-                and host_view["scanned"]
-                and host_view["discovered"]
-                and host_view["on_host"]
-                and not host_view["escalated"]
+                host_view["on_host"]
+                and not host_view["phase"] >= 3
             )
         elif (
             action == ARTImpact
         ):  # valid if host["scanned"] && host["sweeped"] && host["discovered"] && host.on_target && host["escalated"]
             return (
-                host_view["sweeped"]
-                and host_view["scanned"]
-                and host_view["discovered"]
-                and host_view["on_host"]
-                and host_view["escalated"]
-                and not host_view["impacted"]
+                host_view["on_host"]
+                and not host_view["phase"] >= 4
             )
         else:
             return False
