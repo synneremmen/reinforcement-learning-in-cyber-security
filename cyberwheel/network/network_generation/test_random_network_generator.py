@@ -151,8 +151,8 @@ class RandomNetworkGenerator:
                 return False
 
             cross_subnet_exists = has_cross_subnet_interface()
-            print("Checking for existing cross-subnet interfaces...", cross_subnet_exists)
-            print("Current interfaces:", interfaces)
+            # print("Checking for existing cross-subnet interfaces...", cross_subnet_exists)
+            # print("Current interfaces:", interfaces)
 
             if not cross_subnet_exists:
                 subnet_to_hosts = {}
@@ -166,11 +166,11 @@ class RandomNetworkGenerator:
 
                 eligible_subnet_hosts = {}
                 for subnet, hosts in subnet_to_hosts.items():
-                    print(f"Subnet {subnet} has hosts: {hosts}")
+                    # print(f"Subnet {subnet} has hosts: {hosts}")
                     eligible_subnet_hosts[subnet] = []
                     for host in hosts:
                         if host in interfaces.keys():
-                            print("Host with existing interface found for subnet", subnet, ":", host)
+                            # print("Host with existing interface found for subnet", subnet, ":", host)
                             eligible_subnet_hosts.pop(subnet, None) # only want subnets with no existing outgoing interfaces, so remove from eligible list if any host has an interface
                             break
                         eligible_subnet_hosts[subnet].append(host)

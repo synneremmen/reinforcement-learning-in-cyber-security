@@ -246,7 +246,7 @@ class RLTrainer:
                 t = "table"
             else: 
                 t = ""
-            network_files = generate_random_networks(n_networks=self.args.num_envs, name=self.args.experiment_name, output_path="cyberwheel/data/configs/network", t=t)
+            network_files = generate_random_networks(n_networks=self.args.num_envs, name=self.args.experiment_name, output_path="cyberwheel/data/configs/network", t=t, seed=self.args.seed)
             for i, net_file in enumerate(network_files):
                 network = Network.create_network_from_yaml(net_file)
                 network_name = network.name
