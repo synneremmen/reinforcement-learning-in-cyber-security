@@ -230,8 +230,8 @@ def generate_random_networks(n_networks=10, name=None, output_path="cyberwheel/d
             num_subnets = (2, 2)
             hosts_per_subnet = (2, 3)
         else:
-            num_subnets = (2, random.randint(3, 6, seed=seed))
-            hosts_per_subnet = (3, random.randint(5, 12, seed=seed))
+            num_subnets = (2, random.Random(seed).randint(3, 6))
+            hosts_per_subnet = (3, random.Random(seed).randint(5, 12))
         # print(f"Generating network {i+1}/{n_networks} with num_subnets={num_subnets} and hosts_per_subnet={hosts_per_subnet}")
         file_path = generator.generate_and_save(
             output_path=output_path,
