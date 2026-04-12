@@ -1,6 +1,7 @@
 # CleanRL script for training Cage Challenge 2 agents. CleanRL documentation can be found at https://docs.cleanrl.dev/,
 import os
 import time
+import torch
 
 from cyberwheel.utils import parse_override_args, YAMLConfig
 from cyberwheel.runners.rl_trainer import RLTrainer
@@ -20,9 +21,6 @@ def train_cyberwheel(args: YAMLConfig):
     args.batch_size = int(args.num_envs * args.num_steps)   # Number of environment steps to performa backprop with
     args.minibatch_size = int(args.batch_size // args.num_minibatches)  # Number of environments steps to perform backprop with in each epoch
     args.num_updates = args.total_timesteps // args.batch_size  # Total number of policy update phases
-    args.save_frequency = int(args.num_updates / args.num_saves)    # Number of policy updates between each model save and evaluation
-    if args.save_frequency == 0:
-        args.save_frequency = 1
 
     # Unique experiment name if empty
     if not args.experiment_name:
@@ -41,7 +39,7 @@ def train_cyberwheel(args: YAMLConfig):
     trainer.configure_training()
 
     for update in range(1, args.num_updates + 1):
-        # print(f"----- Update {update} -----")
+        print(f"----- Update {update} -----")
         # update envs each training step if leader and entry host are random (initial method to test)
         red_agent = trainer.handler.envs.envs[0].red_agent
         if red_agent.leader == "random" and red_agent.entry_host == "random":
