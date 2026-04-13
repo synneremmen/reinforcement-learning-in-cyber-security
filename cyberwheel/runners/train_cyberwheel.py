@@ -22,6 +22,11 @@ def train_cyberwheel(args: YAMLConfig):
     args.minibatch_size = int(args.batch_size // args.num_minibatches)  # Number of environments steps to perform backprop with in each epoch
     args.num_updates = args.total_timesteps // args.batch_size  # Total number of policy update phases
 
+    if args.num_saves > 0:
+        args.save_frequency = int(args.num_updates / args.num_saves)    # Number of policy updates between each model save and evaluation
+    else:
+        args.save_frequency = 1
+
     # Unique experiment name if empty
     if not args.experiment_name:
         args.experiment_name = f"{os.path.basename(__file__).rstrip('.py')}_{args.seed}_{int(time.time())}"
