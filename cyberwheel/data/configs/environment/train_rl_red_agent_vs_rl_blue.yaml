@@ -32,7 +32,7 @@ agents:
   # red: rl_red_agent.yaml
   # red: rl_red_complex.yaml
   red: rl_red_agent.yaml
-policy_type: qlearning # table_based # actor_critic
+policy_type: table_based # table_based # actor_critic
 
 valid_targets: servers
 reward_function: RLReward # The reward function
