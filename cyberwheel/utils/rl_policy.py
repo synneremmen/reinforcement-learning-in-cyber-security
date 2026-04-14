@@ -189,27 +189,34 @@ class RLPolicyTableBased(nn.Module):
         print(f"Initialized Q-table with shape {len(self.q_table)} x {self.action_space_shape} = {len(self.q_table) * self.action_space_shape} entries")
         self.epsilon = epsilon
 
-    def _new_q_values(self):
-        return torch.zeros(self.action_space_shape, device=self.device)
+    def _state_key(self, obs):
+        x = torch.as_tensor(obs, device="cpu").reshape(-1)
+        # Your observation is logically discrete (-1, 0, 1, 2, ...), so lock it to ints
+        x = torch.round(x).to(torch.int16)
+        return tuple(x.tolist())
 
-    def _get_state_q(self, state):
-        q_values = self.q_table.get(state)
+    def _new_q_values(self):
+        return torch.rand(self.action_space_shape, device=self.device)
+
+    def _get_state_q(self, obs):
+        obs = self._state_key(obs)
+        q_values = self.q_table.get(obs)
         if q_values is None:
             q_values = self._new_q_values()
-            self.q_table[state] = q_values
+            self.q_table[obs] = q_values
         return q_values
-
+    
     def get_action_and_value(self, obs, action=None, action_mask=None):
         if action is None:
             action = self.greedy_action(obs, action_mask)
         value = self.get_value(obs, action)
         return action, value , None, None
         
-    def get_value(self, state, action): # best action value for a given state
-        return self._get_state_q(state)[int(action)].item() 
+    def get_value(self, obs, action): # best action value for a given state
+        return self._get_state_q(obs)[int(action)].item() 
     
-    def get_best_value(self, state, action_mask=None):
-        q_values = self._get_state_q(state)
+    def get_best_value(self, obs, action_mask=None):
+        q_values = self._get_state_q(obs)
         if action_mask is not None:
             q_values = q_values.clone()
             q_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)] = float("-inf")
@@ -218,8 +225,8 @@ class RLPolicyTableBased(nn.Module):
             best_value = torch.max(q_values).item()
         return best_value
     
-    def greedy_action(self, state, action_mask=None):
-        action_values = self._get_state_q(state)
+    def greedy_action(self, obs, action_mask=None):
+        action_values = self._get_state_q(obs)
         if action_mask is not None:
             action_values = action_values.clone()
             action_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=action_values.device)] = float("-inf")
@@ -239,24 +246,17 @@ class RLPolicyTableBased(nn.Module):
         else:
             return self.greedy_action(obs, mask)
 
-    def normalize_reward(self, reward):
-        # min_v = -10 # worst reward
-        # max_v = 1000 # best possible reward (capture the flag)
-        # how would i do this if z-score normalization?
-        # return (reward - self.reward_mean) / (self.reward_std + 1e-9)
-        return reward #  (reward - min_v) / (max_v - min_v) # number between 0 and 1
-
     def update_q_table(self, obs, action, reward, next_obs, done, next_action_mask=None, alpha=0.1, gamma=0.99):
         """Update Q-table using Q-learning update rule"""
-        normalized_reward = float(self.normalize_reward(float(torch.as_tensor(reward).item())))
+        obs = self._state_key(obs)
         done = bool(torch.as_tensor(done).item())
         action_idx = int(torch.as_tensor(action).item())
     
         if done:
-            td_target = normalized_reward
+            td_target = reward
         else:
             best_next_q = self.get_best_value(next_obs, next_action_mask)
-            td_target = normalized_reward + gamma * best_next_q
+            td_target = reward + gamma * best_next_q
         
         td_error = td_target - self.get_value(obs, action_idx)
         update_value = alpha * td_error
