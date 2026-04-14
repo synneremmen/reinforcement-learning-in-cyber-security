@@ -23,15 +23,15 @@ def color_map(host_view) -> str:
         escalated                   -->     Orange
         impacted                    -->     Red
         """
-        if host_view["phase"] >= 4:
+        if host_view["phase"] == 5:
             return "red"
-        elif host_view["phase"] >= 3:
+        elif host_view["phase"] == 4:
             return "orange"
-        elif host_view["phase"] >= 2:
+        elif host_view["phase"] == 3:
             return "yellow"
-        elif host_view["phase"] >= 1:
+        elif host_view["phase"] == 2:
             return "green"
-        elif host_view["phase"] >= 0:
+        elif host_view["phase"] == 1:
             return "green"
         else:
             return "gray"

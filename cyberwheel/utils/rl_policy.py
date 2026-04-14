@@ -248,7 +248,6 @@ class RLPolicyTableBased(nn.Module):
 
     def update_q_table(self, obs, action, reward, next_obs, done, next_action_mask=None, alpha=0.1, gamma=0.99):
         """Update Q-table using Q-learning update rule"""
-        obs = self._state_key(obs)
         done = bool(torch.as_tensor(done).item())
         action_idx = int(torch.as_tensor(action).item())
     

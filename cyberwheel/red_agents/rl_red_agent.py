@@ -116,21 +116,21 @@ class RLARTAgent(ARTAgent):
         target_host = result.target_host.name
         if action == ARTPingSweep:  # Adds pingsweeped hosts to obs
             # print(f"Updated host {target_host} to sweeped in observation")
-            self.observation.update_host(target_host, phase=0) # sweeped = True
+            self.observation.update_host(target_host, phase=1) # sweeped = True
             hosts = result.metadata[result.target_host.subnet.name]["sweeped_hosts"]
             for h in hosts:
                 h_name = h.name
                 if h_name in self.observation.obs.keys():
                     continue
                 sweeped = h.subnet.name == result.target_host.subnet.name
-                self.observation.add_host(h_name, phase=0 if sweeped else -1)
+                self.observation.add_host(h_name, phase=1 if sweeped else 0)
                 self.action_space.add_host(h_name)
         elif action == ARTPortScan:  # Scans target host
             # print(f"Updated host {target_host} to scanned in observation")
-            self.observation.update_host(target_host, phase=1) # scanned=True
+            self.observation.update_host(target_host, phase=2) # scanned=True
         elif action == ARTDiscovery:  # Discovers host type
             # print(f"Updated host {target_host} to discovered in observation")
-            self.observation.update_host(target_host, phase=2, type=result.target_host.host_type.type) # discovered=True
+            self.observation.update_host(target_host, phase=3, type=result.target_host.host_type.type) # discovered=True
         elif action == ARTLateralMovement:  # Moves to target host
             # print(f"Updated host {target_host} to on_host in observation")
             self.observation.update_host(target_host, on_host=True)
@@ -140,10 +140,10 @@ class RLARTAgent(ARTAgent):
             self.current_host = result.target_host
         elif action == ARTPrivilegeEscalation:
             # print(f"Updated host {target_host} to escalated in observation")
-            self.observation.update_host(target_host, phase=3) # escalated=True
+            self.observation.update_host(target_host, phase=4) # escalated=True
         elif action == ARTImpact:
             # print(f"Updated host {target_host} to impacted in observation")
-            self.observation.update_host(target_host, phase=4) # impacted=True
+            self.observation.update_host(target_host, phase=5) # impacted=True
 
     def handle_network_change(self):
         current_hosts = self.network.hosts.keys()
@@ -153,31 +153,31 @@ class RLARTAgent(ARTAgent):
             self.service_mapping[h] = self.get_valid_techniques_by_host(
                 host, self.all_kcps
             )
-            self.observation.add_host(h, phase=0) # set to sweeped
+            self.observation.add_host(h, phase=1) # set to sweeped
             self.action_space.add_host(h)
         self.tracked_hosts = current_hosts
     
 
     def validate_action(self, action: ARTKillChainPhase, target_host: str) -> bool:
-        # 0-4 (sweeped, scanned, discovered, escalated, impacted)
+        # 0-5 (unknown, sweeped, scanned, discovered, escalated, impacted)
         if action == Nothing:
             return True
         host_view = self.observation.obs[target_host]
         if action == ARTPingSweep:  # valid if host["sweeped"] == False
-            return host_view["phase"] == -1 # if phase is -1, then nothing has been done to the host, so valid for pingsweep
+            return host_view["phase"] == 0 # if phase is -1, then nothing has been done to the host, so valid for pingsweep
         elif (
             action == ARTPortScan
         ):  # valid if host["scanned"] == False and host["sweeped"] == True
-            return host_view["phase"] == 0 # if phase is 0, then sweeped is true, but not scanned
+            return host_view["phase"] == 1 # if phase is 0, then sweeped is true, but not scanned
         elif (
             action == ARTDiscovery
         ):  # valid if host["scanned"] && host["sweeped"] && !host["discovered"]
-            return host_view["phase"] == 1 # if phase is 1, then sweeped and scanned are true, but not discovered
+            return host_view["phase"] == 2 # if phase is 1, then sweeped and scanned are true, but not discovered
         elif (
             action == ARTLateralMovement
         ):  # valid if host["scanned"] && host["sweeped"] && host["discovered"] && !host.on_target
             return (
-                host_view["phase"] == 2 # if phase is 2, then sweeped, scanned, and discovered are true
+                host_view["phase"] == 3 # if phase is 2, then sweeped, scanned, and discovered are true
                 and not host_view["on_host"]
             )
         elif (
@@ -185,14 +185,14 @@ class RLARTAgent(ARTAgent):
         ):  # valid if host["scanned"] && host["sweeped"] && host["discovered"] && host.on_target && !host["escalated"]
             return (
                 host_view["on_host"]
-                and host_view["phase"] == 2 # if discovered but not escalated
+                and host_view["phase"] == 3 # if discovered but not escalated
             )
         elif (
             action == ARTImpact
         ):  # valid if host["scanned"] && host["sweeped"] && host["discovered"] && host.on_target && host["escalated"]
             return (
                 host_view["on_host"]
-                and host_view["phase"] == 3 # if escalated but not impacted
+                and host_view["phase"] == 4 # if escalated but not impacted
             )
         else:
             return False

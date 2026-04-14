@@ -41,7 +41,7 @@ class RedObservation(Observation):
             ObservationAttribute("on_host", 'bool'), # 0 or 1
             # ObservationAttribute("escalated", 'bool'),
             # ObservationAttribute("impacted", 'bool'),
-            ObservationAttribute("phase", 'int'), # 0-4 (sweeped, scanned, discovered, escalated, impacted)
+            ObservationAttribute("phase", 'int'), # 1-5 (sweeped, scanned, discovered, escalated, impacted)
             ObservationAttribute("visited", 'bool'), # 0-1
         ]
         self.attributes["subnet"] = [] # Define all subnet-level observations
@@ -51,7 +51,10 @@ class RedObservation(Observation):
         
     def add_host(self, host: str, **kwargs):
         ip_as_key = kwargs.get("ip_as_key", False)
-        self.obs[host] = {attr.name: int(kwargs.get(attr.name, 0)) for attr in self.attributes["host"]}
+        self.obs[host] = {
+            attr.name: int(kwargs.get(attr.name, 0))
+            for attr in self.attributes["host"]
+        }
         self.obs_index[host] = self.size
         num_host_attributes = len(self.attributes["host"])
         self.obs_vec[self.size:(self.size + num_host_attributes)] = list(self.obs[host].values())

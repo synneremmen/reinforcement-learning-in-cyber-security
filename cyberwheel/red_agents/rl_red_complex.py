@@ -152,27 +152,27 @@ class RLComplexAgent(ARTAgent):
         except KeyError:
             phase = action.name
         if phase == "pingsweep":  # Adds pingsweeped hosts to obs
-            self.observation.update_host(target_host, phase=0) # sweeped=True
+            self.observation.update_host(target_host, phase=1) # sweeped=True
             hosts = result.metadata[result.target_host.subnet.name]["sweeped_hosts"]
             for h in hosts:
                 h_name = h.name
                 if h_name in self.observation.obs.keys():
                     continue
                 sweeped = h.subnet.name == result.target_host.subnet.name
-                self.observation.add_host(h_name, phase=0 if sweeped else -1)
+                self.observation.add_host(h_name, phase=1 if sweeped else 0)
                 self.action_space.add_host(h_name)
         elif phase == "portscan":  # Scans target host
-            self.observation.update_host(target_host, phase=1) # scanned=True
+            self.observation.update_host(target_host, phase=2) # scanned=True
         elif phase == "discovery":  # Discovers host type
-            self.observation.update_host(target_host, phase=2, type=result.target_host.host_type.type) # discovered=True
+            self.observation.update_host(target_host, phase=3, type=result.target_host.host_type.type) # discovered=True
         elif phase == "lateral-movement":  # Moves to target host
             self.observation.update_host(target_host, on_host=True)
             self.observation.update_host(src_host, on_host=False)
             self.current_host = result.target_host
         elif phase == "privilege-escalation":
-            self.observation.update_host(target_host, phase=3) # escalated=True
+            self.observation.update_host(target_host, phase=4) # escalated=True
         elif phase == "impact":
-            self.observation.update_host(target_host, phase=4) # impacted=True
+            self.observation.update_host(target_host, phase=5) # impacted=True
 
     def handle_network_change(self):
         current_hosts = self.network.hosts.keys()
@@ -182,7 +182,7 @@ class RLComplexAgent(ARTAgent):
             self.service_mapping[h] = self.get_valid_techniques_by_host(
                 host, self.all_kcps
             )
-            self.observation.add_host(h, phase=0) # set to sweeped
+            self.observation.add_host(h, phase=1) # set to sweeped
             self.action_space.add_host(h)
         self.tracked_hosts = current_hosts
     
@@ -197,25 +197,25 @@ class RLComplexAgent(ARTAgent):
         host_view = self.observation.obs[target_host]
         # print("Host view:", host_view)
         if phase == "pingsweep":  # valid if host hasn't been sweeped
-            return not host_view["phase"] >= 0
+            return host_view["phase"] == 0
         elif phase == "portscan":  # valid if host hasn't been scanned and host has been sweeped
-            return not host_view["phase"] >= 1
+            return host_view["phase"] == 1
         elif phase == "discovery":  # valid if host has been scanned and sweeped but not discovered
-            return not host_view["phase"] >= 2
+            return host_view["phase"] == 2
         elif phase == "lateral-movement":  # valid if host has been scanned and sweeped and discovered but not on target
             return (
-                host_view["phase"] >= 2
+                host_view["phase"] == 3
                 and not host_view["on_host"]
             )
         elif phase == "privilege-escalation":  # valid if host has been scanned and sweeped and discovered and on target but not escalated
             return (
                 host_view["on_host"]
-                and not host_view["phase"] >= 3
+                and host_view["phase"] == 3
             )
         elif phase == "impact":  # valid if host has been scanned and sweeped and discovered and on target and escalated
             return (
                 host_view["on_host"]
-                and not host_view["phase"] >= 4
+                and host_view["phase"] == 4
             )
         else:
             return False
