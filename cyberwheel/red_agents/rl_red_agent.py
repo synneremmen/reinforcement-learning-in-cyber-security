@@ -160,8 +160,6 @@ class RLARTAgent(ARTAgent):
 
     def validate_action(self, action: ARTKillChainPhase, target_host: str) -> bool:
         # 0-4 (sweeped, scanned, discovered, escalated, impacted)
-        if action != Nothing:
-            print("Host view: ", self.observation.obs[target_host])
         if action == Nothing:
             return True
         host_view = self.observation.obs[target_host]
