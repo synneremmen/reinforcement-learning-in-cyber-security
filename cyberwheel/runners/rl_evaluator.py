@@ -104,7 +104,7 @@ class RLEvaluator(RLTrainer):
                     files("cyberwheel.data.models").joinpath(self.args.experiment_name), exist_ok=True
                 )
             
-            if "table" in self.args.experiment_name.lower():
+            if self.args.policy_type == "table_based":
                 self.policy[agent] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape, device=self.device)
                 save_dict = torch.load(
                                 files(f"cyberwheel.data.models.{self.args.experiment_name}").joinpath(agent_filename),
