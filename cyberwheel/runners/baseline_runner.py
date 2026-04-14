@@ -22,7 +22,7 @@ class BaselineRunner:
             )
             network = Network.create_network_from_yaml(network_config)
         else:
-            network_file = generate_random_networks(n_networks=1, output_path="cyberwheel/data/configs/network", t="table")
+            network_file = generate_random_networks(n_networks=1, output_path="cyberwheel/data/configs/network", t="table", seed=self.args.seed)
             network = Network.create_network_from_yaml(network_file[0])
 
         self.args.service_mapping = get_service_map(network)

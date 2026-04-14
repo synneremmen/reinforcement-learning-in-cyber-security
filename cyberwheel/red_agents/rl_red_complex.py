@@ -152,27 +152,27 @@ class RLComplexAgent(ARTAgent):
         except KeyError:
             phase = action.name
         if phase == "pingsweep":  # Adds pingsweeped hosts to obs
-            self.observation.update_host(target_host, sweeped=True)
+            self.observation.update_host(target_host, phase=0) # sweeped=True
             hosts = result.metadata[result.target_host.subnet.name]["sweeped_hosts"]
             for h in hosts:
                 h_name = h.name
                 if h_name in self.observation.obs.keys():
                     continue
                 sweeped = h.subnet.name == result.target_host.subnet.name
-                self.observation.add_host(h_name, sweeped=sweeped)
+                self.observation.add_host(h_name, phase=0 if sweeped else -1)
                 self.action_space.add_host(h_name)
         elif phase == "portscan":  # Scans target host
-            self.observation.update_host(target_host, scanned=True)
+            self.observation.update_host(target_host, phase=1) # scanned=True
         elif phase == "discovery":  # Discovers host type
-            self.observation.update_host(target_host, discovered=True, type=result.target_host.host_type.type)
+            self.observation.update_host(target_host, phase=2, type=result.target_host.host_type.type) # discovered=True
         elif phase == "lateral-movement":  # Moves to target host
             self.observation.update_host(target_host, on_host=True)
             self.observation.update_host(src_host, on_host=False)
             self.current_host = result.target_host
         elif phase == "privilege-escalation":
-            self.observation.update_host(target_host, escalated=True)
+            self.observation.update_host(target_host, phase=3) # escalated=True
         elif phase == "impact":
-            self.observation.update_host(target_host, impacted=True)
+            self.observation.update_host(target_host, phase=4) # impacted=True
 
     def handle_network_change(self):
         current_hosts = self.network.hosts.keys()
@@ -182,7 +182,7 @@ class RLComplexAgent(ARTAgent):
             self.service_mapping[h] = self.get_valid_techniques_by_host(
                 host, self.all_kcps
             )
-            self.observation.add_host(h, sweeped=True)
+            self.observation.add_host(h, phase=0) # set to sweeped
             self.action_space.add_host(h)
         self.tracked_hosts = current_hosts
     

@@ -55,7 +55,7 @@ class RLPolicyActorCritic(nn.Module):
         Also calculates the log probabilities of the action and the policy's entropy which are used to calculate PPO's training loss.
         """
         logits = self.actor(obs)
-        if action_mask != None:
+        if action_mask is not None:
             logits = logits.masked_fill(~action_mask, float("-inf"))
 
         probs = Categorical(logits=logits)
@@ -70,8 +70,10 @@ class RLPolicyQlearning(nn.Module):
     Also includes functions for getting values from the critic and actions from the actor.
     """
 
-    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.1, num_hosts=6, device="cpu"):
+    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=1):
         super().__init__()
+        obs_space_shape = int(np.array(obs_space_shape).prod())
+        print(f"Initializing Q-learning policy with obs space shape {obs_space_shape} and action space shape {action_space_shape}")
         self.model = nn.Sequential(
             nn.Linear(obs_space_shape, 64),
             nn.ReLU(),
@@ -79,76 +81,108 @@ class RLPolicyQlearning(nn.Module):
             nn.ReLU(),
             nn.Linear(64, action_space_shape),
         )
-        obs_space_shape = int(np.array(obs_space_shape).prod())
+        self.lossfn = nn.MSELoss()
         self.obs_space_shape = obs_space_shape
         self.action_space_shape = action_space_shape
-        self.num_hosts = num_hosts # TODO: hardcoded, bad coding...
-        self.device = device
-        print(f"Using {self.num_hosts} hosts:")
-        print(f"Initialized model with shape {self.model.shape}")
+        self.device = torch.device("cpu")
         self.epsilon = epsilon
 
     def get_action(self, obs, action_mask=None):
         q_values = self.model(obs)
+        if q_values.dim() == 1:
+            q_values = q_values.unsqueeze(0)
         if action_mask is not None:
             mask = torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)
+            if mask.dim() == 1:
+                mask = mask.unsqueeze(0)
             q_values = q_values.masked_fill(~mask, float("-inf"))
-        return int(torch.argmax(q_values).item())
+        return torch.argmax(q_values, dim=1)
+    
+    def get_value(self, obs, action=None, action_mask=None):
+        q_values = self.model(obs)
+        squeeze_output = False
+        if q_values.dim() == 1:
+            q_values = q_values.unsqueeze(0)
+            squeeze_output = True
+        if action_mask is not None:
+            mask = torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)
+            if mask.dim() == 1:
+                mask = mask.unsqueeze(0)
+            q_values = q_values.masked_fill(~mask, float("-inf"))
+        if action is None:
+            values = torch.max(q_values, dim=1).values
+            return values.squeeze(0) if squeeze_output else values
+        action = torch.as_tensor(action, dtype=torch.long, device=q_values.device)
+        if action.dim() == 0:
+            action = action.unsqueeze(0)
+        values = q_values.gather(1, action.view(-1, 1)).squeeze(1)
+        return values.squeeze(0) if squeeze_output else values
+    
+    def get_action_and_value(self, obs, action=None, action_mask=None):
+        q_values = self.model(obs)
+        if action_mask is not None:
+            q_values = q_values.masked_fill(~action_mask, float("-inf"))
+        
+        if action is None:
+            action = torch.argmax(q_values, dim=1)
+
+        values = q_values.gather(1, action.view(-1, 1)).squeeze(1)
+        return action, values
     
     def select_action(self, obs, action_mask):
-        """Select action using epsilon-greedy with action mask"""
-        if np.random.uniform() < self.epsilon:
-            valid_actions = torch.where(action_mask)[0]
-            if len(valid_actions) > 0:
-                random_idx = torch.randint(0, len(valid_actions), (1,), device=self.device)
-                return int(valid_actions[random_idx].item())
-            else:
-                return 0
-        else:
-            logits = self.model(obs)
-            if action_mask is not None:
-                logits = logits.masked_fill(~action_mask, float("-inf"))
-            probs = nn.Softmax(logits, dim=-1)
-            action = torch.argmax(probs)
-            return action.item()
+        """Select actions for a batch using epsilon-greedy with action mask."""
+        q_values = self.model(obs)
+        if q_values.dim() == 1:
+            q_values = q_values.unsqueeze(0)
+
+        mask = torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)
+        if mask.dim() == 1:
+            mask = mask.unsqueeze(0)
+
+        masked_q = q_values.masked_fill(~mask, float("-inf"))
+        greedy_actions = torch.argmax(masked_q, dim=1)
+
+        random_scores = torch.rand_like(masked_q)
+        random_scores = random_scores.masked_fill(~mask, -1.0)
+        random_actions = torch.argmax(random_scores, dim=1)
+
+        explore_mask = torch.rand(masked_q.shape[0], device=q_values.device) < self.epsilon
+        actions = torch.where(explore_mask, random_actions, greedy_actions)
+        return actions
         
-    def update_q_table(self, obs, action, reward, next_obs, done, next_action_mask=None, alpha=0.1, gamma=0.99):
-        """Update Q-table using Q-learning update rule"""
-        normalized_reward = float(self.normalize_reward(float(torch.as_tensor(reward).item())))
-        done = bool(torch.as_tensor(done).item())
-        action_idx = int(torch.as_tensor(action).item())
+    def greedy_action(self, obs, action_mask=None):
+        q_values = self.model(obs)
+        if action_mask is not None:
+            q_values = q_values.clone()
+            q_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)] = float("-inf")
+        greedy_action = torch.argmax(q_values)
+        return greedy_action.item()
+        
+    def get_best_value(self, obs, action_mask=None):
+        q_values = self.model(obs)
+        if q_values.dim() == 1:
+            q_values = q_values.unsqueeze(0)
+        if action_mask is not None:
+            mask = torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)
+            if mask.dim() == 1:
+                mask = mask.unsqueeze(0)
+            q_values = q_values.masked_fill(~mask, float("-inf"))
+        best_value = torch.max(q_values, dim=1).values
+        return best_value
     
-        if done:
-            td_target = normalized_reward
-        else:
-            best_next_q = self.get_best_value(next_obs, next_action_mask)
-            td_target = normalized_reward + gamma * best_next_q
-        
-        td_error = td_target - self.get_value(obs, action_idx)
-        update_value = alpha * td_error
-
-        self._get_state_q(obs)[action_idx] += update_value
-        return float(update_value)
-        # q(s,a) = q(s,a) + alpha(R + gamma maxq(nexts,a) - q(s,a))
-        # q(s,a) = q(s,a) + alpha * td_error
-        # der td_error = td_target - get_value(s,a)
-        # og td_target = R + gamma * best_next_q
-
 
 class RLPolicyTableBased(nn.Module): 
     """
-    TODO: Add header
+    TODO: Add header∂s
     """
-    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.1, num_hosts=6, device="cpu"):
+    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.1, device="cpu"):
         super().__init__()
         obs_space_shape = int(np.array(obs_space_shape).prod())
         self.obs_space_shape = obs_space_shape
         self.action_space_shape = action_space_shape
-        self.num_hosts = num_hosts # TODO: hardcoded, bad coding...
         self.device = device
         # self.state_space = (1 + 3 * 2**6)**self.num_hosts
         # self.compressed_state_space = (1 + 3 * 2*4)**self.num_hosts # given that we compress the 7 host-level attributes to 3, and keep the global attribute, we get 1 + 3*6 possible combinations per host
-        print(f"Using {self.num_hosts} hosts:")
         #print(f"Size of q_table: {self.compressed_state_space} x {self.action_space_shape} = {self.compressed_state_space * self.action_space_shape} entries")
         self.q_table = defaultdict(self._new_q_values)
         # default to random values [0,1] to encourage exploration of unseen actions?

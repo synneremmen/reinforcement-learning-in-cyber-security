@@ -17,6 +17,7 @@ from torch import optim, nn
 from importlib.resources import files
 from statistics import mean, median
 
+from cyberwheel.runners.rl_q_handler import RLQHandler
 from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTableBased
 from cyberwheel.utils.get_service_map import get_service_map
 from cyberwheel.utils.set_seed import set_seed
@@ -232,12 +233,14 @@ class RLTrainer:
 
         if self.args.policy_type == "table_based":
             self.handler = RLTableHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
+        elif self.args.policy_type == "qlearning":
+            self.handler = RLQHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
         else:
             self.handler = RLHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
 
         self.handler.define_multiagent_variables()
 
-    def get_envs(self):
+    def get_envs(self, seed=None):
         if self.args.network_config is None:
             # Load randomly generated networks
             self.networks = {}
@@ -246,7 +249,7 @@ class RLTrainer:
                 t = "table"
             else: 
                 t = ""
-            network_files = generate_random_networks(n_networks=self.args.num_envs, name=self.args.experiment_name, output_path="cyberwheel/data/configs/network", t=t, seed=self.args.seed)
+            network_files = generate_random_networks(n_networks=self.args.num_envs, name=self.args.experiment_name, output_path="cyberwheel/data/configs/network", t=t, seed=seed)
             for i, net_file in enumerate(network_files):
                 network = Network.create_network_from_yaml(net_file)
                 network_name = network.name
@@ -334,8 +337,9 @@ class RLTrainer:
         self.handler.log_stuff(self.writer, episode_time, episode_process_time)
         
         # Calculate advantages used to optimize the policy and returns which are compared to values to optimize the critic.
-        if isinstance(self.handler, RLPolicyActorCritic):
-            self.handler.compute_gae()
+        if isinstance(self.handler, (RLHandler, RLQHandler)):
+            if self.args.policy_type == "actor_critic":
+                self.handler.compute_gae()
 
             # Flatten the batch
             self.handler.flatten_batch()
@@ -353,9 +357,8 @@ class RLTrainer:
                     mb_inds = b_inds[start:end]
 
                     self.handler.update_policy(mb_inds)
-                    if isinstance(self.handler, RLPolicyActorCritic):
-                        self.handler.calculate_loss(mb_inds)
-                        self.handler.backpropagate(update)
+                    self.handler.calculate_loss(mb_inds)
+                    self.handler.backpropagate(update)
 
                 if self.args.target_kl is not None:
                     if self.handler.approx_kl > self.args.target_kl:

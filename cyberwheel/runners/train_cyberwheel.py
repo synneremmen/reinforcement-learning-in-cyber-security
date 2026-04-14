@@ -48,7 +48,8 @@ def train_cyberwheel(args: YAMLConfig):
         # update envs each training step if leader and entry host are random (initial method to test)
         red_agent = trainer.handler.envs.envs[0].red_agent
         if red_agent.leader == "random" and red_agent.entry_host == "random":
-            trainer.handler.envs = trainer.get_envs()  # reinitialize envs (entry host and leader will be reselected)
+            seed = trainer.args.seed + update  # change seed each update to get different networks
+            trainer.handler.envs = trainer.get_envs(seed=seed)  # reinitialize envs (entry host and leader will be reselected)
         trainer.train(update)
 
     trainer.close()

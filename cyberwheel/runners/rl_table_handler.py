@@ -37,6 +37,8 @@ class RLTableHandler:
     def _reset_red_diagnostics(self):
         self.red_action_attempts = defaultdict(int)
         self.red_action_successes = defaultdict(int)
+        # self.steps_before_first_valid_target = self.args.num_steps * 2 # how to indicate no flag found?
+        # self.number_of_impacted_targets = 0
         self.red_reward_valid_targets = 0.0
         self.red_reward_invalid_targets = 0.0
         self.red_valid_target_attempts = 0
@@ -114,12 +116,12 @@ class RLTableHandler:
 
         for agent in self.agents:
             for env_idx in range(self.args.num_envs):
-                reward_val = self.agents[agent]["rewards"][step][env_idx].item()
-                self.agents[agent]["episode_rewards"][env_idx] += reward_val
-                self.agents[agent]["episode_lengths"][env_idx] += 1
                 self.agents[agent]["next_obs"][env_idx] = torch.Tensor(obs[agent][env_idx]).to(self.device)
                 if f"{agent}_reward" in info:
                     self.agents[agent]["rewards"][step][env_idx] = torch.tensor(info[f"{agent}_reward"][env_idx], dtype=torch.float32).to(self.device)
+                reward_val = self.agents[agent]["rewards"][step][env_idx].item()
+                self.agents[agent]["episode_rewards"][env_idx] += reward_val
+                self.agents[agent]["episode_lengths"][env_idx] += 1
 
                 if agent == "red" and "red_action" in info and "red_action_success" in info and "red_target_valid" in info:
                     action_name = info["red_action"][env_idx]
@@ -260,7 +262,6 @@ class RLTableHandler:
                 import wandb
                 wandb.save(str(agent_path), base_path=str(run_path), policy="now")
                 wandb.save(str(globalstep_path), base_path=str(run_path), policy="now")
-                
             agent_paths[agent] = agent_path
         return agent_paths
 
@@ -338,11 +339,11 @@ class RLTableHandler:
                 epsilon = initial_epsilon - (initial_epsilon - final_epsilon) * min(episode / decay_episodes, 1.0)
                 self.agents[agent]["policy"].epsilon = epsilon
 
-    def expand_model(self, old_policy, expansion_type="q_values", num_hosts=6):
+    def expand_model(self, old_policy, expansion_type="q_values"):
         old_action_shape = old_policy.action_space_shape
         old_q_table = old_policy.q_table
         new_action_shape = self.agents["red"]["policy"].action_space_shape
-        print(f"Expanding model from action shape {old_action_shape} to {new_action_shape} with {num_hosts} hosts...")
+        print(f"Expanding model from action shape {old_action_shape} to {new_action_shape} with {self.args.max_num_hosts} hosts...")
         new_q_table = defaultdict(lambda: torch.zeros(new_action_shape))
         # each action in the old action space corresponds to one or multiple actions in the new action space
         """
