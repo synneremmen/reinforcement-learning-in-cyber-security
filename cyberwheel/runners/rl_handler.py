@@ -217,7 +217,12 @@ class RLHandler:
             self.agents[agent]["explained_variance"] = np.nan if var == 0 else 1 - np.var(true - pred) / var
     
     def save_models(self):
-        run_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
+        if self.args.nrec:
+            run_path = files("persistent01.cyberwheel.data.models").joinpath(self.args.experiment_name)
+        elif self.args.drive:
+            run_path = files("content.drive.MyDrive.RLCS.models").joinpath(self.args.experiment_name)
+        else:
+            run_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
         agent_paths = {}
         if not os.path.exists(run_path):
             os.makedirs(run_path)

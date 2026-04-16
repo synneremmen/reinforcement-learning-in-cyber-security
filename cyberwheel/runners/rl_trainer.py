@@ -191,7 +191,13 @@ class RLTrainer:
         shutil.copytree(self.run_dir, self.drive_run_dir, dirs_exist_ok=True)
 
     def configure_training(self):
-        self.run_dir = Path(str(files("cyberwheel.data.runs").joinpath(self.args.experiment_name)))
+        if self.args.nrec:
+            run_path = files("persistent01.cyberwheel.data.runs").joinpath(self.args.experiment_name)
+        elif self.args.drive:
+            run_path = files("content.drive.MyDrive.RLCS.runs").joinpath(self.args.experiment_name)
+        else:
+            run_path = files("cyberwheel.data.runs").joinpath(self.args.experiment_name)
+        self.run_dir = Path(str(run_path))
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.writer = SummaryWriter(str(self.run_dir))  # Logs data to tensorboard and W&B
         self.writer.add_text(

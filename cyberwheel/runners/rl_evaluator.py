@@ -103,11 +103,16 @@ class RLEvaluator(RLTrainer):
                 model.download(
                     files("cyberwheel.data.models").joinpath(self.args.experiment_name), exist_ok=True
                 )
-            
+            if self.args.nrec:
+                load_path = files("persistent01.cyberwheel.data.models").joinpath(self.args.experiment_name)
+            elif self.args.drive:
+                load_path = files("content.drive.MyDrive.RLCS.models").joinpath(self.args.experiment_name)
+            else:
+                load_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
             if self.args.policy_type == "table_based":
                 self.policy[agent] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape, device=self.device)
                 save_dict = torch.load(
-                                files(f"cyberwheel.data.models.{self.args.experiment_name}").joinpath(agent_filename),
+                                load_path.joinpath(agent_filename),
                                 map_location=self.device,
                                 weights_only=False,
                             )
@@ -122,7 +127,7 @@ class RLEvaluator(RLTrainer):
                 self.policy[agent] = RLPolicyActorCritic(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape).to(self.device)            
                 self.policy[agent].load_state_dict(
                     torch.load(
-                        files(f"cyberwheel.data.models.{self.args.experiment_name}").joinpath(agent_filename),
+                        load_path.joinpath(agent_filename),
                         map_location=self.device,
                     )
                 )

@@ -231,8 +231,12 @@ class RLTableHandler:
         pass
 
     def save_models(self):
-        
-        run_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
+        if self.args.nrec:
+            run_path = files("persistent01.cyberwheel.data.models").joinpath(self.args.experiment_name)
+        elif self.args.drive:
+            run_path = files("content.drive.MyDrive.RLCS.models").joinpath(self.args.experiment_name)
+        else:
+            run_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
         agent_paths = {}
         if not os.path.exists(run_path):
             os.makedirs(run_path)
@@ -268,12 +272,15 @@ class RLTableHandler:
     def load_models(self, name="red_agent"):
         """Load Q-tables from disk"""
         for agent in self.agents:
-            if self.args.drive:
-                agent_path = Path("/content/drive/MyDrive/RLCS/model") / self.args.experiment_name / f"{name}.pt"
-                print(f"Loading {agent} agent from Google Drive path: {agent_path}")
+            if self.args.nrec:
+                load_path = files("persistent01.cyberwheel.data.models").joinpath(self.args.experiment_name)
+            elif self.args.drive:
+                load_path = Path(str(files("content.drive.MyDrive.RLCS.models").joinpath(self.args.experiment_name)))
             else:
-                agent_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name).joinpath(f"{name}.pt")
-            print(f"Loading {agent} agent from Google Drive path: {agent_path}")
+                load_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
+            
+            agent_path = load_path.joinpath(f"{name}.pt")
+            print(f"Loading {agent} agent from: {agent_path}")
             if os.path.exists(agent_path):
                 save_dict = torch.load(agent_path, map_location=torch.device(self.device))
                 
