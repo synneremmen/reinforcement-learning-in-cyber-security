@@ -33,7 +33,7 @@ class RandomNetworkGenerator:
         
         if host_types is None:
             # host_types = ["workstation", "web_server"] # remove database_server since it is not defined in host definitions?
-            host_types = ["mail_server", "file_server", "web_server", "ssh_jump_server", "proxy_server", "workstation"]
+            host_types = ["mail_server", "file_server", "web_server", "workstation"] #  "ssh_jump_server", "proxy_server"
         
         # Generate network name if not provided
         if network_name is None:
@@ -92,7 +92,7 @@ class RandomNetworkGenerator:
             for j in range(n_hosts):
                 host_name = f"host_{host_id:03d}" # format: pad with leading zeros to ensure 3 digits
                 # host_type = self.rng.choice(host_types) # add probabilities?
-                host_type = self.rng.choices(host_types, weights=[0.10, 0.10, 0.10, 0.10, 0.10, 0.5], k=1)[0]
+                host_type = self.rng.choices(host_types, weights=[0.2, 0.2, 0.2, 0.5], k=1)[0] # 0.15, 0.15
                 # higher chance of workstation (user hosts), lower chance of proxy_server
                 
                 if j == n_hosts - 1:
