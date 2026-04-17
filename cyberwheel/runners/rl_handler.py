@@ -1,6 +1,6 @@
 from torch import nn, optim
 
-from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTableBased
+from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTableBased, RLPolicyQLearning
 from gymnasium.vector import VectorEnv, AsyncVectorEnv
 
 from importlib.resources import files
@@ -22,14 +22,16 @@ class RLHandler:
         #print(agents)
         self.agents = {}
         self.static_agents = static_agents
-        if self.args.policy_type not in ["actor_critic", "table_based"]:
-            raise ValueError(f"Invalid policy type '{self.args.policy_type}'. Must be either 'actor_critic' or 'table_based'.")
+        if self.args.policy_type not in ["actor_critic", "table_based", "qlearning"]:
+            raise ValueError(f"Invalid policy type '{self.args.policy_type}'. Must be either 'actor_critic', 'table_based', or 'qlearning'.")
 
         for agent in agents:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
             if self.args.policy_type == "table_based":
                 self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], device=self.device)
+            elif self.args.policy_type == "qlearning":
+                self.agents[agent]["policy"] = RLPolicyQLearning(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], device=self.device)
             else:
                 self.agents[agent]["policy"] = RLPolicyActorCritic(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"]).to(self.device)
                 self.agents[agent]["optimizer"] = optim.Adam([

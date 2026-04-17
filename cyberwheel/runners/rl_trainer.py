@@ -24,7 +24,7 @@ from cyberwheel.utils.set_seed import set_seed
 from cyberwheel.runners.rl_handler import RLHandler
 from cyberwheel.runners.rl_table_handler import RLTableHandler
 from cyberwheel.network.network_base import Network
-from cyberwheel.network.network_generation.test_random_network_generator import generate_random_networks
+from cyberwheel.network.network_generation.random_network_generator import generate_random_networks
 
 class RLTrainer:
     def __init__(self, args):
@@ -194,7 +194,7 @@ class RLTrainer:
         if self.args.nrec:
             run_path = files("persistent01.cyberwheel.data.runs").joinpath(self.args.experiment_name)
         elif self.args.drive:
-            run_path = files("content.drive.MyDrive.RLCS.runs").joinpath(self.args.experiment_name)
+            run_path = Path(files("content.drive.MyDrive.RLCS.runs").joinpath(self.args.experiment_name))
         else:
             run_path = files("cyberwheel.data.runs").joinpath(self.args.experiment_name)
         self.run_dir = Path(str(run_path))
@@ -205,10 +205,7 @@ class RLTrainer:
             "|param|value|\n|-|-|\n%s"
             % ("\n".join([f"|{key}|{value}|" for key, value in vars(self.args).items()])),
         )
-        self.drive_run_dir = None
-        if getattr(self.args, "drive", False):
-            self.drive_run_dir = Path("/content/drive/MyDrive/RLCS/runs") / self.args.experiment_name
-            self.drive_run_dir.mkdir(parents=True, exist_ok=True)
+
         # Seeding
         if self.args.deterministic:
             set_seed(self.seed)

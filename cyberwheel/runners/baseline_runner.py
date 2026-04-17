@@ -1,4 +1,4 @@
-from cyberwheel.network.network_generation.test_random_network_generator import generate_random_networks
+from cyberwheel.network.network_generation.random_network_generator import generate_random_networks
 import pandas as pd
 import time
 

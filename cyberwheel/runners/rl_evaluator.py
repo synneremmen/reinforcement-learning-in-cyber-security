@@ -1,6 +1,6 @@
 
 from collections import defaultdict
-from cyberwheel.network.network_generation.test_random_network_generator import generate_random_networks
+from cyberwheel.network.network_generation.random_network_generator import generate_random_networks
 from cyberwheel.utils.rl_policy import RLPolicyTableBased
 import gymnasium as gym
 import time
