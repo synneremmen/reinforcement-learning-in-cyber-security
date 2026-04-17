@@ -64,12 +64,7 @@ class RLPolicyActorCritic(nn.Module):
         return action, probs.log_prob(action), probs.entropy(), self.critic(obs)
     
 
-class RLPolicyQlearning(nn.Module):
-    """
-    The agent class that contains the code for defining the actor and critic networks used by PPO.
-    Also includes functions for getting values from the critic and actions from the actor.
-    """
-
+class RLPolicyQLearning(nn.Module):
     def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=1):
         super().__init__()
         obs_space_shape = int(np.array(obs_space_shape).prod())
@@ -169,13 +164,36 @@ class RLPolicyQlearning(nn.Module):
             q_values = q_values.masked_fill(~mask, float("-inf"))
         best_value = torch.max(q_values, dim=1).values
         return best_value
-    
+
+    def update_policy(self, obs, action, reward, next_obs, done, next_action_mask=None, alpha=0.1, gamma=0.99):
+        """Update the Q-learning policy using the Bellman equation."""
+        obs = torch.as_tensor(obs, dtype=torch.float32, device=self.device)
+        next_obs = torch.as_tensor(next_obs, dtype=torch.float32, device=self.device)
+        action = torch.as_tensor(action, dtype=torch.long, device=self.device)
+        reward = torch.as_tensor(reward, dtype=torch.float32, device=self.device)
+        done = torch.as_tensor(done, dtype=torch.float32, device=self.device)
+
+        q_values = self.model(obs)
+        next_q_values = self.model(next_obs)
+
+        target_q_values = reward + (1 - done) * gamma * torch.max(next_q_values, dim=1).values
+        target_q_values = target_q_values.detach()
+
+        action_q_values = q_values.gather(1, action.view(-1, 1)).squeeze(1)
+
+        loss = self.lossfn(action_q_values, target_q_values)
+
+        self.model.zero_grad()
+        loss.backward()
+        for param in self.model.parameters():
+            param.grad.data.clamp_(-1, 1)
+        # Add optimizer step here to update model parameters based on gradients
 
 class RLPolicyTableBased(nn.Module): 
     """
     TODO: Add header∂s
     """
-    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.1, device="cpu"):
+    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.1, learning_rate=0.1, decay_rate=0.001, device="cpu"):
         super().__init__()
         obs_space_shape = int(np.array(obs_space_shape).prod())
         self.obs_space_shape = obs_space_shape
@@ -188,10 +206,16 @@ class RLPolicyTableBased(nn.Module):
         # default to random values [0,1] to encourage exploration of unseen actions?
         print(f"Initialized Q-table with shape {len(self.q_table)} x {self.action_space_shape} = {len(self.q_table) * self.action_space_shape} entries")
         self.epsilon = epsilon
+        self.learning_rate = learning_rate
+        self.initial_lr = learning_rate
+        self.decay_rate = decay_rate
+        self.update = 0
+
+    def decay_lr(self):
+        self.learning_rate = self.initial_lr / (1 + self.decay_rate * self.update)
 
     def _state_key(self, obs):
-        x = torch.as_tensor(obs, device="cpu").reshape(-1)
-        # Your observation is logically discrete (-1, 0, 1, 2, ...), so lock it to ints
+        x = torch.as_tensor(obs, device=self.device).reshape(-1)
         x = torch.round(x).to(torch.int16)
         return tuple(x.tolist())
 
@@ -258,9 +282,11 @@ class RLPolicyTableBased(nn.Module):
             td_target = reward + gamma * best_next_q
         
         td_error = td_target - self.get_value(obs, action_idx)
-        update_value = alpha * td_error
+        update_value = self.learning_rate * td_error
 
         self._get_state_q(obs)[action_idx] += update_value
+        self.update += 1
+        self.decay_lr()
         return float(update_value)
         # q(s,a) = q(s,a) + alpha(R + gamma maxq(nexts,a) - q(s,a))
         # q(s,a) = q(s,a) + alpha * td_error
