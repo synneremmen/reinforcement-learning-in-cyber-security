@@ -13,7 +13,7 @@ class RedObservation(Observation):
         self.network = network
         
         self.define_attributes()
-        self.max_size = (self.args.max_num_hosts * len(self.attributes["host"])) + len(self.attributes["standalone"])
+        self.max_size = (self.args.num_hosts * len(self.attributes["host"])) + len(self.attributes["standalone"])
         self._init_vars()
     
     def _init_vars(self):

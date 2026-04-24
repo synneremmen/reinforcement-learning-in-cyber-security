@@ -1,7 +1,7 @@
 
 from collections import defaultdict
 from cyberwheel.network.network_generation.random_network_generator import generate_random_networks
-from cyberwheel.utils.rl_policy import RLPolicyTableBased
+from cyberwheel.utils.rl_policy import RLPolicyTableBased, RLPolicyQLearning, RLPolicyActorCritic
 import gymnasium as gym
 import time
 import importlib
@@ -52,7 +52,7 @@ class RLEvaluator(RLTrainer):
             else: 
                 t = ""
 
-            network_configs = generate_random_networks(n_networks=1, output_path="cyberwheel/data/configs/network", seed=self.args.seed if self.args.deterministic else None, t=t)
+            network_configs = generate_random_networks(n_networks=1, output_path="cyberwheel/data/configs/network", num_subnets=self.args.num_subnets, num_hosts=self.args.num_hosts, seed=self.args.seed if self.args.deterministic else None, t=t)
         elif isinstance(self.args.network_config, str):
             network_configs.append(self.args.network_config)
         else:
@@ -123,6 +123,17 @@ class RLEvaluator(RLTrainer):
                 )
                 self.policy[agent].q_table.update(q_table_dict)
                 
+            elif self.args.policy_type == "qlearning":
+                self.policy[agent] = RLPolicyQLearning(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape, eval=True).to(self.device)
+                state_dict = torch.load(
+                    load_path.joinpath(agent_filename),
+                    map_location=self.device,
+                )
+                # Eval mode policies may not instantiate target_model; drop those keys if present.
+                if any(k.startswith("target_model.") for k in state_dict.keys()):
+                    state_dict = {k: v for k, v in state_dict.items() if not k.startswith("target_model.")}
+                self.policy[agent].load_state_dict(state_dict, strict=False)
+                self.policy[agent].eval()
             else:
                 self.policy[agent] = RLPolicyActorCritic(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape).to(self.device)            
                 self.policy[agent].load_state_dict(

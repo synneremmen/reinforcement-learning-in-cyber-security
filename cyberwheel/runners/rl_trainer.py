@@ -18,7 +18,7 @@ from importlib.resources import files
 from statistics import mean, median
 
 from cyberwheel.runners.rl_q_handler import RLQHandler
-from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTableBased
+from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTableBased, RLPolicyQLearning
 from cyberwheel.utils.get_service_map import get_service_map
 from cyberwheel.utils.set_seed import set_seed
 from cyberwheel.runners.rl_handler import RLHandler
@@ -152,6 +152,10 @@ class RLTrainer:
                 if isinstance(self.handler, RLTableHandler):
                     eval_agent = RLPolicyTableBased(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"], device=eval_device)
                     eval_agent.q_table = loaded_models[agent]
+                elif isinstance(self.handler, RLQHandler):
+                    eval_agent = RLPolicyQLearning(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"]).to(eval_device)
+                    eval_agent.load_state_dict(loaded_models[agent])
+                    eval_agent.eval()
                 else:
                     eval_agent = RLPolicyActorCritic(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"]).to(eval_device)
                     eval_agent.load_state_dict(loaded_models[agent])
@@ -252,7 +256,7 @@ class RLTrainer:
                 t = "table"
             else: 
                 t = ""
-            network_files = generate_random_networks(n_networks=self.args.num_envs, name=self.args.experiment_name, output_path="cyberwheel/data/configs/network", t=t, seed=seed)
+            network_files = generate_random_networks(n_networks=self.args.num_envs, num_subnets=self.args.num_subnets, num_hosts=self.args.num_hosts, name=self.args.experiment_name, output_path="cyberwheel/data/configs/network", t=t, seed=seed)
             for i, net_file in enumerate(network_files):
                 network = Network.create_network_from_yaml(net_file)
                 network_name = network.name

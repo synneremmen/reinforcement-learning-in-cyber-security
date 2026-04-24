@@ -1,3 +1,4 @@
+import math
 import random
 from cyberwheel.network.network_generation.network_generator import NetworkYAMLGenerator
 
@@ -191,6 +192,7 @@ class RandomNetworkGenerator:
                         network.interface(host_a, host_b)
                 # print("Updated interfaces:", network.data.get("interfaces"))
         # print()
+        
         return network
     
     def generate_and_save(self, output_path="cyberwheel/data/configs/network", **kwargs):
@@ -209,12 +211,15 @@ class RandomNetworkGenerator:
         return f"{output_path}/{network.file_name}.yaml"
 
 
-def generate_random_networks(n_networks=10, name=None, output_path="cyberwheel/data/configs/network", seed=None, t=""):
+def generate_random_networks(n_networks=10, num_subnets: int = None, num_hosts: int = None, name=None, output_path="cyberwheel/data/configs/network", seed=None, t=""):
     """
     Generate multiple random network configurations.
     
     Args:
         n_networks: number of networks to generate
+        num_subnets: int of max number of subnets
+        num_hosts: int of number of hosts per subnet
+        name: name for the generated networks
         output_path: directory to save YAMLs
         seed: random seed for reproducibility
     
@@ -226,17 +231,21 @@ def generate_random_networks(n_networks=10, name=None, output_path="cyberwheel/d
     files = []
     
     for i in range(n_networks):
+        
         if t == "table": # not exceed 6 hosts for table-based policy due to combinatorial explosion of state space
-            num_subnets = (2, 2)
-            hosts_per_subnet = (2, 3)
+            rng_num_subnets = (2, 2)
+            hosts_per_subnet = 3
+            min_hosts_per_subnet = 2
+            rng_hosts_per_subnet = (min_hosts_per_subnet, hosts_per_subnet)
         else:
-            num_subnets = (2, random.Random(seed).randint(3, 6))
-            hosts_per_subnet = (3, random.Random(seed).randint(5, 12))
-        # print(f"Generating network {i+1}/{n_networks} with num_subnets={num_subnets} and hosts_per_subnet={hosts_per_subnet}")
+            rng_num_subnets = (int(num_subnets * 2//3), num_subnets) if num_subnets else (2, 5)
+            hosts_per_subnet = math.floor(num_hosts / num_subnets) if num_hosts else None
+            rng_hosts_per_subnet = (int(hosts_per_subnet * 2 // 3), hosts_per_subnet)
+
         file_path = generator.generate_and_save(
             output_path=output_path,
-            num_subnets=num_subnets,
-            hosts_per_subnet=hosts_per_subnet,
+            num_subnets=rng_num_subnets,
+            hosts_per_subnet=rng_hosts_per_subnet,
             network_name=f"{name}-random-network-{i:03d}" if name else f"random-network-{i:03d}"
         )
         files.append(file_path)
