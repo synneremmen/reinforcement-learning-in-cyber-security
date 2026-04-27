@@ -188,7 +188,7 @@ class RLPolicyQLearning(nn.Module):
                                 curr_count = values[i]
                                 end_idx = out_idx + curr_count
                                 # action shape x 64
-                                new_weights = old_layer.weight[i, :] # get old weight
+                                new_weights = old_layer.weight[i, :] / curr_count # get old weight
                                 new_bias = old_layer.bias[i] # get old bias
                                 new_layer.weight[out_idx:end_idx, :].copy_(new_weights.repeat(curr_count, 1))
                                 new_layer.bias[out_idx:end_idx].copy_(new_bias)
@@ -197,7 +197,6 @@ class RLPolicyQLearning(nn.Module):
 
                         else:
                             # Copy weights and biases for the overlapping part of the layers
-                            print(f"Copying weights for layer with shape {old_layer.weight.shape} to new layer with shape {new_layer.weight.shape}...")
                             new_layer.weight.copy_(old_layer.weight)
                             new_layer.bias.copy_(old_layer.bias)
 

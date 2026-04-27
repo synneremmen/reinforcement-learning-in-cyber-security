@@ -310,7 +310,7 @@ class RLQHandler:
                 self.episode = 1
                 self._reset_red_diagnostics()
             
-                print(f"Loaded {agent} with fresh history (epsilon={self.initial_epsilon})")
+                # print(f"Loaded {agent} with fresh history (epsilon={self.initial_epsilon})")
                 
     
     def log_training_metrics(self, writer):
