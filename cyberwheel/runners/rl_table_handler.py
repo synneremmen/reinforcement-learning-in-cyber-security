@@ -31,22 +31,24 @@ class RLTableHandler:
             self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], self.initial_epsilon, device=self.device)
 
         if self.load:
-            print(self.args.experiment_name)
             self.load_models()
 
     def _reset_red_diagnostics(self):
         self.red_action_attempts = defaultdict(int)
         self.red_action_successes = defaultdict(int)
-        # self.steps_before_first_valid_target = self.args.num_steps * 2 # how to indicate no flag found?
-        # self.number_of_impacted_targets = 0
+        self.steps_before_first_valid_target = 0 # how to indicate no flag found?
+        self.reached_valid_target = False
+        self.number_of_impacted_valid_targets = 0
         self.red_reward_valid_targets = 0.0
         self.red_reward_invalid_targets = 0.0
         self.red_valid_target_attempts = 0
         self.red_invalid_target_attempts = 0
+        self.num_valid_targets = torch.zeros(self.args.num_envs)
 
     def _phase_bucket(self, action_name, phase_list=None):
         action = str(action_name).lower()
         if phase_list is not None:
+            # required when using complex agent
             for phase in phase_list[0]:
                 if phase in ["discovery", "impact"]:
                     return phase
@@ -112,7 +114,7 @@ class RLTableHandler:
             policy_action[agent] = self.agents[agent]["actions"][step].cpu().numpy()
             # self.[step] = self.next_done 
 
-        obs, reward, done, _, info = self.envs.step(policy_action)
+        obs, reward, done, _, info = self.envs.step(policy_action) # take a step in the environment
 
         for agent in self.agents:
             for env_idx in range(self.args.num_envs):
@@ -123,15 +125,27 @@ class RLTableHandler:
                 self.agents[agent]["episode_rewards"][env_idx] += reward_val
                 self.agents[agent]["episode_lengths"][env_idx] += 1
 
+                if not self.reached_valid_target and agent == "red":
+                    self.steps_before_first_valid_target += 1
+
                 if agent == "red" and "red_action" in info and "red_action_success" in info and "red_target_valid" in info:
+                    # if action successful, the target valid, log the outcome
+                    self.num_valid_targets[env_idx] = len(info["valid_targets"][env_idx])
                     action_name = info["red_action"][env_idx]
-                    # phase = self._phase_bucket(action_name)
                     kill_chain_phases = info.get("red_kill_chain_phases", [])
                     phase = self._phase_bucket(action_name, kill_chain_phases)
-                    
                     success = bool(info["red_action_success"][env_idx])
                     valid_target = bool(info["red_target_valid"][env_idx])
-                    red_reward = float(info["red_reward"][env_idx]) if "red_reward" in info else 0.0
+                    successful_impact = success and valid_target and phase == "impact"
+
+                    if not self.reached_valid_target and successful_impact:
+                        # reached first valid target
+                        self.reached_valid_target = True
+                        print(f"Reached first valid target on step {self.steps_before_first_valid_target}")
+
+                    if successful_impact:
+                        # log number of valid impacted targets
+                        self.number_of_impacted_valid_targets += 1
 
                     self.red_action_attempts[phase] += 1
                     if success:
@@ -139,10 +153,10 @@ class RLTableHandler:
 
                     if valid_target:
                         self.red_valid_target_attempts += 1
-                        self.red_reward_valid_targets += red_reward
+                        self.red_reward_valid_targets += reward_val
                     else:
                         self.red_invalid_target_attempts += 1
-                        self.red_reward_invalid_targets += red_reward
+                        self.red_reward_invalid_targets += reward_val
 
         self.next_done = torch.Tensor(done).to(self.device)
 
@@ -165,6 +179,7 @@ class RLTableHandler:
                 writer.add_scalar(f"charts/{agent}_max_q_value", max_q, self.global_step)
                 writer.add_scalar(f"charts/{agent}_num_states_visited", num_states, self.global_step)
                 
+                
         # print(output_str)
         writer.add_scalar("charts/episodic_runtime", episodic_runtime, self.global_step)
         writer.add_scalar("charts/episodic_process_time", episodic_processing_time, self.global_step)
@@ -174,6 +189,11 @@ class RLTableHandler:
         writer.add_scalar("charts/red_valid_target_attempt_ratio", valid_ratio, self.global_step)
         writer.add_scalar("charts/red_reward_valid_targets", self.red_reward_valid_targets, self.global_step)
         writer.add_scalar("charts/red_reward_invalid_targets", self.red_reward_invalid_targets, self.global_step)
+        writer.add_scalar("charts/red_steps_before_first_valid_target", self.steps_before_first_valid_target, self.global_step)
+        writer.add_scalar("charts/red_number_of_impacted_valid_targets", self.number_of_impacted_valid_targets, self.global_step)
+        writer.add_scalar("charts/number_valid_targets", self.num_valid_targets, self.global_step)
+        impact_ratio = self.number_of_impacted_valid_targets / self.num_valid_targets
+        writer.add_scalar("charts/red_impacted_valid_targets_ratio", impact_ratio, self.global_step)
 
         for phase in ["discovery", "impact"]:
             attempts = self.red_action_attempts[phase]
@@ -251,13 +271,6 @@ class RLTableHandler:
                 'global_step': self.global_step,
                 'num_states': len(q_table_dict),
             }
-            if getattr(self.args, "drive", False):
-                drive_model_dir = Path("/content/drive/MyDrive/RLCS/model/" + self.args.experiment_name)
-                drive_model_dir.mkdir(parents=True, exist_ok=True)
-                torch.save(save_dict, drive_model_dir / f"{agent}_agent.pt")
-                torch.save(save_dict, drive_model_dir / f"{agent}_{self.global_step}.pt")
-                print("Models saved to Google Drive.")
-            
             torch.save(save_dict, agent_path)
             torch.save(save_dict, globalstep_path)
             print(f"Saved {agent} to {agent_path}")
