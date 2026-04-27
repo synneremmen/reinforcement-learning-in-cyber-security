@@ -65,7 +65,7 @@ class RLPolicyActorCritic(nn.Module):
     
 
 class RLPolicyQLearning(nn.Module):
-    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=1):
+    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.2, learning_rate=0.1, decay_rate=0.001, use_target=True, eval=False):
         super().__init__()
         obs_space_shape = int(np.array(obs_space_shape).prod())
         print(f"Initializing Q-learning policy with obs space shape {obs_space_shape} and action space shape {action_space_shape}")
@@ -76,118 +76,89 @@ class RLPolicyQLearning(nn.Module):
             nn.ReLU(),
             nn.Linear(64, action_space_shape),
         )
-        self.lossfn = nn.MSELoss()
+        self.device = torch.device("cpu") # "cuda" if torch.cuda.is_available() else
         self.obs_space_shape = obs_space_shape
         self.action_space_shape = action_space_shape
-        self.device = torch.device("cpu")
         self.epsilon = epsilon
+        self.learning_rate = learning_rate
+        self.use_target = use_target if use_target is not None else False
+        if self.use_target and not eval:
+            self.tau = 0.005
+            self.target_model = nn.Sequential(
+            nn.Linear(obs_space_shape, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, action_space_shape),
+            )
+            self.target_model.load_state_dict(self.model.state_dict())
+            self.target_model.eval()
 
-    def get_action(self, obs, action_mask=None):
-        q_values = self.model(obs)
-        if q_values.dim() == 1:
-            q_values = q_values.unsqueeze(0)
-        if action_mask is not None:
-            mask = torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)
-            if mask.dim() == 1:
-                mask = mask.unsqueeze(0)
-            q_values = q_values.masked_fill(~mask, float("-inf"))
-        return torch.argmax(q_values, dim=1)
-    
+    def soft_update(self):
+        for tp, sp in zip(self.target_model.parameters(), self.model.parameters()):
+            tp.data.copy_((1 - self.tau) * tp.data + self.tau * sp.data)
+
     def get_value(self, obs, action=None, action_mask=None):
-        q_values = self.model(obs)
-        squeeze_output = False
-        if q_values.dim() == 1:
-            q_values = q_values.unsqueeze(0)
-            squeeze_output = True
-        if action_mask is not None:
-            mask = torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)
-            if mask.dim() == 1:
-                mask = mask.unsqueeze(0)
-            q_values = q_values.masked_fill(~mask, float("-inf"))
-        if action is None:
-            values = torch.max(q_values, dim=1).values
-            return values.squeeze(0) if squeeze_output else values
-        action = torch.as_tensor(action, dtype=torch.long, device=q_values.device)
-        if action.dim() == 0:
-            action = action.unsqueeze(0)
-        values = q_values.gather(1, action.view(-1, 1)).squeeze(1)
-        return values.squeeze(0) if squeeze_output else values
-    
-    def get_action_and_value(self, obs, action=None, action_mask=None):
-        q_values = self.model(obs)
-        if action_mask is not None:
-            q_values = q_values.masked_fill(~action_mask, float("-inf"))
-        
-        if action is None:
-            action = torch.argmax(q_values, dim=1)
-
-        values = q_values.gather(1, action.view(-1, 1)).squeeze(1)
-        return action, values
-    
-    def select_action(self, obs, action_mask):
-        """Select actions for a batch using epsilon-greedy with action mask."""
-        q_values = self.model(obs)
-        if q_values.dim() == 1:
-            q_values = q_values.unsqueeze(0)
-
-        mask = torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)
-        if mask.dim() == 1:
-            mask = mask.unsqueeze(0)
-
-        masked_q = q_values.masked_fill(~mask, float("-inf"))
-        greedy_actions = torch.argmax(masked_q, dim=1)
-
-        random_scores = torch.rand_like(masked_q)
-        random_scores = random_scores.masked_fill(~mask, -1.0)
-        random_actions = torch.argmax(random_scores, dim=1)
-
-        explore_mask = torch.rand(masked_q.shape[0], device=q_values.device) < self.epsilon
-        actions = torch.where(explore_mask, random_actions, greedy_actions)
-        return actions
-        
-    def greedy_action(self, obs, action_mask=None):
         q_values = self.model(obs)
         if action_mask is not None:
             q_values = q_values.clone()
             q_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)] = float("-inf")
-        greedy_action = torch.argmax(q_values)
-        return greedy_action.item()
-        
-    def get_best_value(self, obs, action_mask=None):
-        q_values = self.model(obs)
-        if q_values.dim() == 1:
-            q_values = q_values.unsqueeze(0)
-        if action_mask is not None:
-            mask = torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)
-            if mask.dim() == 1:
-                mask = mask.unsqueeze(0)
-            q_values = q_values.masked_fill(~mask, float("-inf"))
-        best_value = torch.max(q_values, dim=1).values
-        return best_value
+        if action is None:
+            values = torch.max(q_values, dim=1).values.reshape(-1, 1)
+        else:
+            values = q_values.gather(1, action.view(-1, 1))
+        if float("-inf") in values:
+            # i.e. action nothing will always be available so this should never be the case
+            raise ValueError("All Q-values are -inf for the given action mask.")
 
-    def update_policy(self, obs, action, reward, next_obs, done, next_action_mask=None, alpha=0.1, gamma=0.99):
-        """Update the Q-learning policy using the Bellman equation."""
+        return values
+    
+    def get_action_and_value(self, obs, action=None, action_mask=None):
         obs = torch.as_tensor(obs, dtype=torch.float32, device=self.device)
-        next_obs = torch.as_tensor(next_obs, dtype=torch.float32, device=self.device)
-        action = torch.as_tensor(action, dtype=torch.long, device=self.device)
-        reward = torch.as_tensor(reward, dtype=torch.float32, device=self.device)
-        done = torch.as_tensor(done, dtype=torch.float32, device=self.device)
+        if obs.dim() == 1:
+            obs = obs.unsqueeze(0)
 
-        q_values = self.model(obs)
-        next_q_values = self.model(next_obs)
+        logits = self.model(obs)
+        if action_mask is not None:
+            action_mask = torch.as_tensor(action_mask, dtype=torch.bool, device=logits.device)
+            if action_mask.dim() == 1:
+                action_mask = action_mask.unsqueeze(0)
+            logits = logits.masked_fill(~action_mask, float("-inf"))
 
-        target_q_values = reward + (1 - done) * gamma * torch.max(next_q_values, dim=1).values
-        target_q_values = target_q_values.detach()
+        if action is None:
+            probs = Categorical(logits=logits)
+            action = probs.sample() # randomization
+            
+        value = self.get_value(obs, action)
+        return action, None, None, value
+    
 
-        action_q_values = q_values.gather(1, action.view(-1, 1)).squeeze(1)
+    def select_action(self, obs, action_mask):
+        """Select action using epsilon-greedy with action mask"""
+        mask = torch.as_tensor(action_mask, dtype=torch.bool, device=self.device)
+        if np.random.uniform() < self.epsilon:
+            valid_actions = torch.where(mask)[0]
+            if len(valid_actions) > 0:
+                random_idx = torch.randint(0, len(valid_actions), (1,), device=self.device)
+                return int(valid_actions[random_idx].item())
+            else:
+                return 0
+        else:
+            return self.greedy_action(obs, mask)
+    
+    def greedy_action(self, obs, action_mask=None):
+        obs = torch.as_tensor(obs, dtype=torch.float32, device=self.device)
+        if obs.dim() == 1:
+            obs = obs.unsqueeze(0)
 
-        loss = self.lossfn(action_q_values, target_q_values)
-
-        self.model.zero_grad()
-        loss.backward()
-        for param in self.model.parameters():
-            param.grad.data.clamp_(-1, 1)
-        # Add optimizer step here to update model parameters based on gradients
+        logits = self.model(obs)
+        if action_mask is not None:
+            action_mask = torch.as_tensor(action_mask, dtype=torch.bool, device=logits.device)
+            if action_mask.dim() == 1:
+                action_mask = action_mask.unsqueeze(0)
+            logits = logits.masked_fill(~action_mask, float("-inf"))
+        greedy_action = torch.argmax(logits, dim=1)
+        return greedy_action
 
 class RLPolicyTableBased(nn.Module): 
     """
@@ -214,16 +185,42 @@ class RLPolicyTableBased(nn.Module):
     def decay_lr(self):
         self.learning_rate = self.initial_lr / (1 + self.decay_rate * self.update)
 
-    def _state_key(self, obs):
-        x = torch.as_tensor(obs, device=self.device).reshape(-1)
-        x = torch.round(x).to(torch.int16)
-        return tuple(x.tolist())
+    def obs_to_state(self, obs):
+        obs_tensor = torch.as_tensor(obs, device=self.device)
+        if obs_tensor.ndim > 1:
+            obs_tensor = obs_tensor.reshape(-1)
+
+        state = []
+        global_att = int(obs_tensor[-1].item())
+        host_obs = obs_tensor[: self.obs_space_shape - 1]
+        host_obs = host_obs.reshape(self.num_hosts, -1)[:, :8]
+        for host_idx in range(self.num_hosts):
+            host_features = host_obs[host_idx]
+            type_, sweeped, scanned, discovered, on_host, escalated, impacted = [int(v.item()) for v in host_features[:7]]
+            
+            if impacted == 1:
+                curr = 4
+            elif escalated == 1:
+                curr = 3
+            elif discovered == 1:
+                curr = 2
+            elif scanned == 1:
+                curr = 1
+            elif sweeped == 1 or on_host == 1:
+                curr = 0
+            else:
+                curr = -1
+
+            state.extend([type_, int(on_host), int(curr)])
+
+        state.append(global_att)
+        return tuple(state)
 
     def _new_q_values(self):
         return torch.rand(self.action_space_shape, device=self.device)
 
     def _get_state_q(self, obs):
-        obs = self._state_key(obs)
+        obs = self.obs_to_state(obs)
         q_values = self.q_table.get(obs)
         if q_values is None:
             q_values = self._new_q_values()
@@ -244,9 +241,7 @@ class RLPolicyTableBased(nn.Module):
         if action_mask is not None:
             q_values = q_values.clone()
             q_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)] = float("-inf")
-            best_value = torch.max(q_values).item()
-        else:
-            best_value = torch.max(q_values).item()
+        best_value = torch.max(q_values).item()
         return best_value
     
     def greedy_action(self, obs, action_mask=None):
