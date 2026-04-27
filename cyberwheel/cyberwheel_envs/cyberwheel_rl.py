@@ -138,6 +138,7 @@ class CyberwheelRL(gym.Env, Cyberwheel):
             "red_action_success": red_agent_result.success,
             "red_target_valid": red_target_valid,
             "red_kill_chain_phases": red_kill_chain_phases,
+            "valid_targets": valid_targets
             }
         
         if self.evaluation:

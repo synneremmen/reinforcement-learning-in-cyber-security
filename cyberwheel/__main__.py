@@ -1,6 +1,6 @@
 import sys
 from cyberwheel.utils import parse_default_override_args, parse_eval_override_args, parse_override_args, parse
-from cyberwheel.runners import train_cyberwheel, evaluate_cyberwheel, run_cyberwheel, run_visualization_server, train_table_agents
+from cyberwheel.runners import train_cyberwheel, evaluate_cyberwheel, run_cyberwheel, run_visualization_server, train_table_agents, train_approx_agents
 
 def display_help():
     sys.argv = ['']
@@ -42,7 +42,10 @@ if __name__ == "__main__":
         if mode == 'train':
             train_cyberwheel(args)
         elif mode == 'train_expansion':
-            train_table_agents(args)
+            if args.policy_type == "table_based":
+                train_table_agents(args)
+            elif args.policy_type == "qlearning":
+                train_approx_agents(args)
         elif mode == 'train_all':
             args = parse(config1, mode)
             train_table_agents(args)

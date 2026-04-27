@@ -375,7 +375,7 @@ class RLTableHandler:
             new_q_table[state] = self.get_new_action_values(action_values, expansion_type)
 
         print("New Q-table initialized with", len(new_q_table), "states and", new_q_table[next(iter(new_q_table))].shape, "actions per state.")
-        return new_q_table
+        self.agents["red"]["policy"].q_table = new_q_table
 
     def get_action_mapping(self, path="/cyberwheel/data/configs/red_agent/rl_red_complex.yaml"):
         # mapping of new actions given indicies of old found in yaml file

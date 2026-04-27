@@ -7,4 +7,4 @@ from cyberwheel.runners.run_visualization_server import run_visualization_server
 from cyberwheel.runners.baseline_runner import BaselineRunner
 from cyberwheel.runners.train_cyberwheel import train_cyberwheel
 from cyberwheel.runners.visualizer import Visualizer
-from cyberwheel.runners.expansion import train_table_agents
+from cyberwheel.runners.expansion import train_table_agents, train_approx_agents

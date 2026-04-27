@@ -159,6 +159,56 @@ class RLPolicyQLearning(nn.Module):
             logits = logits.masked_fill(~action_mask, float("-inf"))
         greedy_action = torch.argmax(logits, dim=1)
         return greedy_action
+    
+    def expand_model(self, old_policy, method=None, mapping=None):
+        new_action_space_shape = self.action_space_shape
+        new_model = nn.Sequential(
+            nn.Linear(self.obs_space_shape, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, new_action_space_shape),
+        ).to(self.device)
+        if method == "copy":
+            values = list(mapping.values())
+            with torch.no_grad():
+                for old_layer, new_layer in zip(old_policy.model, new_model):
+                    out_idx = 0
+                    if isinstance(old_layer, nn.Linear) and isinstance(new_layer, nn.Linear):
+                        # create new weigths with new_action_space_shape and divide the old weights on the corrospending features in the new weight matrix
+                        if new_layer.out_features == new_action_space_shape:
+                            # only last action layer changes
+                            for i in range(len(values)):
+                                curr_count = values[i]
+                                end_idx = out_idx + curr_count
+                                # action shape x 64
+                                new_weights = old_layer.weight[i, :] # get old weight
+                                new_bias = old_layer.bias[i] # get old bias
+                                new_layer.weight[out_idx:end_idx, :].copy_(new_weights.repeat(curr_count, 1))
+                                new_layer.bias[out_idx:end_idx].copy_(new_bias)
+                                out_idx = end_idx
+                            # last layer, output layer that we want to expand
+
+                        else:
+                            # Copy weights and biases for the overlapping part of the layers
+                            print(f"Copying weights for layer with shape {old_layer.weight.shape} to new layer with shape {new_layer.weight.shape}...")
+                            new_layer.weight.copy_(old_layer.weight)
+                            new_layer.bias.copy_(old_layer.bias)
+
+        print(f"Expanded model from {old_policy.action_space_shape} to {new_action_space_shape}")
+        self.model = new_model
+        self.action_space_shape = new_action_space_shape
+        if self.use_target:
+            self.target_model = nn.Sequential(
+                nn.Linear(self.obs_space_shape, 64),
+                nn.ReLU(),
+                nn.Linear(64, 64),
+                nn.ReLU(),
+                nn.Linear(64, new_action_space_shape),
+            ).to(self.device)
+            self.target_model.load_state_dict(self.model.state_dict())
+            # copy expanded weights to target model
+            self.target_model.eval()
 
 class RLPolicyTableBased(nn.Module): 
     """

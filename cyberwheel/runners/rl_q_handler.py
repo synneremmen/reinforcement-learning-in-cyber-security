@@ -27,6 +27,7 @@ class RLQHandler:
         self.static_agents = static_agents
         self.episode = 1
         self.load = getattr(self.args, 'load', False)
+        self.visited_states = set()
 
         for agent in agents:
             self.agents[agent] = agents[agent]
@@ -125,6 +126,7 @@ class RLQHandler:
 
         # print(f"Step {step}: Executing actions {policy_action} in the environment.")
         obs, reward, done, _, info = self.envs.step(policy_action)
+        self.visited_states.update(tuple(obs[agent][i].tolist()) for agent in self.agents for i in range(self.args.num_envs))
 
         for agent in self.agents:
             for env_idx in range(self.args.num_envs):
@@ -193,6 +195,7 @@ class RLQHandler:
         writer.add_scalar("charts/red_valid_target_attempt_ratio", valid_ratio, self.global_step)
         writer.add_scalar("charts/red_reward_valid_targets", self.red_reward_valid_targets, self.global_step)
         writer.add_scalar("charts/red_reward_invalid_targets", self.red_reward_invalid_targets, self.global_step)
+        writer.add_scalar("charts/red_num_states_visited", len(self.visited_states), self.global_step)
 
         for phase in ["discovery", "impact"]:
             attempts = self.red_action_attempts[phase]
@@ -334,6 +337,7 @@ class RLQHandler:
         for action in action_data.split("\n\n"):
             phase = action.split("phase:")[1].strip()
             phases[phase] += 1
+        self.mapping = phases
 
-    def expand_model(self, abstract_policy, method=None):    
-        self.agents["red"]["policy"].expand_model(abstract_policy["agents"]["red"]["obs_shape"], abstract_policy["agents"]["red"]["action_space_size"], method=method, mapping=self.get_action_mapping())
+    def expand_model(self, abstract_policy, method=None):
+        self.agents["red"]["policy"].expand_model(old_policy=abstract_policy, method=method, mapping=self.mapping)
