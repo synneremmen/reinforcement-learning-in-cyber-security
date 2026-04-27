@@ -173,10 +173,10 @@ class RLTableHandler:
             num_states = len(q_table)
             if num_states > 0:
                 all_q_values = torch.stack([v for v in q_table.values()])
-                mean_q = all_q_values.mean().item()
-                max_q = all_q_values.max().item()
-                writer.add_scalar(f"charts/{agent}_mean_q_value", mean_q, self.global_step)
-                writer.add_scalar(f"charts/{agent}_max_q_value", max_q, self.global_step)
+                # mean_q = all_q_values.mean().item()
+                # max_q = all_q_values.max().item()
+                # writer.add_scalar(f"charts/{agent}_mean_q_value", mean_q, self.global_step)
+                # writer.add_scalar(f"charts/{agent}_max_q_value", max_q, self.global_step)
                 writer.add_scalar(f"charts/{agent}_num_states_visited", num_states, self.global_step)
                 
                 
@@ -194,6 +194,7 @@ class RLTableHandler:
         writer.add_scalar("charts/number_valid_targets", self.num_valid_targets, self.global_step)
         impact_ratio = self.number_of_impacted_valid_targets / self.num_valid_targets
         writer.add_scalar("charts/red_impacted_valid_targets_ratio", impact_ratio, self.global_step)
+        writer.add_scalar("charts/red_learning_rate", self.agents[agent]["policy"].learning_rate, self.global_step)
 
         for phase in ["discovery", "impact"]:
             attempts = self.red_action_attempts[phase]

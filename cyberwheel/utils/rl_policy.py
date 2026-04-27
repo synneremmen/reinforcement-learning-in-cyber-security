@@ -80,7 +80,6 @@ class RLPolicyQLearning(nn.Module):
         self.obs_space_shape = obs_space_shape
         self.action_space_shape = action_space_shape
         self.epsilon = epsilon
-        self.learning_rate = learning_rate
         self.use_target = use_target if use_target is not None else False
         if self.use_target and not eval:
             self.tau = 0.005
@@ -93,6 +92,13 @@ class RLPolicyQLearning(nn.Module):
             )
             self.target_model.load_state_dict(self.model.state_dict())
             self.target_model.eval()
+        self.learning_rate = learning_rate
+        self.initial_lr = learning_rate
+        self.decay_rate = decay_rate
+        self.update = 0
+
+    def decay_lr(self):
+        self.learning_rate = self.initial_lr / (1 + self.decay_rate * self.update)
 
     def soft_update(self):
         for tp, sp in zip(self.target_model.parameters(), self.model.parameters()):

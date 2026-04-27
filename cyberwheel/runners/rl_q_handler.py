@@ -196,6 +196,7 @@ class RLQHandler:
         writer.add_scalar("charts/red_reward_valid_targets", self.red_reward_valid_targets, self.global_step)
         writer.add_scalar("charts/red_reward_invalid_targets", self.red_reward_invalid_targets, self.global_step)
         writer.add_scalar("charts/red_num_states_visited", len(self.visited_states), self.global_step)
+        writer.add_scalar("charts/red_learning_rate", self.agents[agent]["optimizer"].param_groups[0]['lr'], self.global_step)
 
         for phase in ["discovery", "impact"]:
             attempts = self.red_action_attempts[phase]
@@ -252,6 +253,9 @@ class RLQHandler:
             target = rewards + (1 - dones) * self.args.gamma * next_q_values
             # moving target... instable learning
             self.agents[agent]["loss"] = self.agents[agent]["lossfn"](q_values, target)
+            self.agents[agent]["policy"].update += 1
+            self.agents[agent]["policy"].decay_lr()
+            self.agents[agent]["optimizer"].param_groups[0]['lr'] = self.agents[agent]["policy"].learning_rate
 
     def backpropagate(self, update):
         for agent in self.agents:
