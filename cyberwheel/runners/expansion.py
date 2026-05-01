@@ -8,7 +8,7 @@ import numpy as np
 import time
 from cyberwheel.runners.rl_trainer import RLTrainer
 
-def train_table_agents(args: YAMLConfig):
+def train_expanded_agents(args: YAMLConfig):
     if args.debug_mode:
         args.num_envs = 1
         args.track = False
@@ -22,141 +22,60 @@ def train_table_agents(args: YAMLConfig):
     if args.save_frequency == 0:
         args.save_frequency = 1
 
-    args.experiment_name = "TableRLRedAgentvsRLBlueAgent"
+    # retrieve abstract agent for policy type
+    # qlearning-RedAgentvsRLBlueAgent
+    # table_based-RedAgentvsRLBlueAgent
+    if args.policy_type not in ["qlearning", "table_based"]:
+        raise ValueError(f"Invalid policy type {args.policy_type}.")
+
+    max_net = args.network_size_compatibility
+    if args.policy_type == "table_based" and hasattr(args, "num_hosts"):
+        args.max_num_hosts = getattr(args, "num_hosts")
+    else:
+        args.max_num_hosts = 100 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
+        
+    if args.policy_type == "table_based" and hasattr(args, "num_subnets"):
+        args.max_num_subnets = getattr(args, "num_subnets")
+    else:
+        args.max_num_subnets = 10 if max_net == 'small' else 100 if max_net == 'medium' else 1000 #if max_net == 'large'
+
+    # Unique experiment name if empty
+    if not args.experiment_name:
+        # args.experiment_name = f"{os.path.basename(__file__).rstrip('.py')}_{args.seed}_{int(time.time())}"
+        args.experiment_name = f"train-{args.policy_type}-{args.max_num_hosts}-{args.seed}"
+
     args.agents["red"] = "rl_red_agent.yaml"
     abstract_trainer = RLTrainer(args)
     abstract_trainer.configure_training()
 
+    print()
     print("*** Abstract agent ***")
-
-    # if args.load:
-    #     # can use model to train
-    #     print("Loading abstract agent...")
     abstract_trainer.handler.load_models()
-    # else:
-    #     # need to train a model
-    #     print("Training abstract agent...")
-    #     for update in range(1, args.num_updates + 1):
-    #         # update envs each training step if leader and entry host are random (initial method to test)
-    #         red_agent = abstract_trainer.handler.envs.envs[0].red_agent
-    #         if red_agent.leader == "random" and red_agent.entry_host == "random":
-    #             abstract_trainer.handler.envs = abstract_trainer.get_envs()  # reinitialize envs (entry host and leader will be reselected)
-    #         abstract_trainer.train(update)
 
     abstract_policy = abstract_trainer.handler.agents["red"]["policy"]
-    abstract_num_states = len(abstract_policy.q_table)
-    print(f"Abstract policy states before expansion: {abstract_num_states}")
-    if abstract_num_states == 0:
-        raise ValueError(
-            "Abstract policy has 0 states before expansion. "
-            "Check that the correct experiment_name is loaded and that red_agent.pt contains a populated q_table."
-        )
 
-    # args.experiment_name = "TableRLExpandedProbsRedAgentvsRLBlueAgent"
-    # args.agents["red"] = "rl_red_complex.yaml"
-    # expanded_probs_trainer = RLTrainer(args)
-    # expanded_probs_trainer.configure_training()  
-    # expanded_probs_trainer.handler.get_action_mapping(files("cyberwheel.data.configs.red_agent").joinpath("rl_red_complex.yaml"))
-    # expanded_probs_trainer.handler.agents["red"]["policy"].q_table = expanded_probs_trainer.handler.expand_model(abstract_policy, "probabilities")
-    # print(f"Expanded-probabilities policy states: {len(expanded_probs_trainer.handler.agents['red']['policy'].q_table)}")
-    # expanded_probs_trainer.handler.initial_epsilon = 1.0
-    # print("Model expanded. Starting training of complex agent...")
-    
-    # print("*** Expanded Probabilities agent ****")
-
-    # for update in range(1, args.num_updates + 1):
-    #     # update envs each training step if leader and entry host are random (initial method to test)
-    #     red_agent = expanded_probs_trainer.handler.envs.envs[0].red_agent
-    #     if red_agent.leader == "random" and red_agent.entry_host == "random":
-    #         expanded_probs_trainer.handler.envs = expanded_probs_trainer.get_envs()  # reinitialize envs (entry host and leader will be reselected)
-    #     expanded_probs_trainer.train(update)
-
-    args.experiment_name = "TableRLExpandedQvaluesRedAgentvsRLBlueAgent"
+    print()
+    print("*** Expanding agent ****")
+    args.seed = args.seed + 1  # change seed to get different envs for expanded agent training
+    args.experiment_name = f"train_expansion-{args.policy_type}-{args.max_num_hosts}-{args.seed}-{args.method}{ '-reuse' if getattr(args, 'reuse_model', True) else '' }-ExpandedRedAgentvsRLBlueAgent"
     args.agents["red"] = "rl_red_complex.yaml"
-    expanded_copy_trainer = RLTrainer(args)
-    expanded_copy_trainer.configure_training()  
-    expanded_copy_trainer.handler.get_action_mapping(files("cyberwheel.data.configs.red_agent").joinpath("rl_red_complex.yaml"))
-    expanded_copy_trainer.handler.agents["red"]["policy"].q_table = expanded_copy_trainer.handler.expand_model(abstract_policy, "q_values")
-    print(f"Expanded-q-values policy states: {len(expanded_copy_trainer.handler.agents['red']['policy'].q_table)}")
-    # expanded_copy_trainer.handler.initial_epsilon = 1.0
-    print("Model expanded. Starting training of complex agent...")
-
-    print("*** Expanded Q-Values agent ****")
+    expanded_trainer = RLTrainer(args)
+    expanded_trainer.configure_training()  
+    expanded_trainer.handler.get_action_mapping(files("cyberwheel.data.configs.red_agent").joinpath("rl_red_complex.yaml"))
+    if args.method not in ["copy_params", "increase_depth", "kl_divergence", "softmax", "copy_values"]:
+        raise ValueError(f"Invalid expansion method {args.method}.")
+    expanded_trainer.handler.expand_model(abstract_policy, args, writer=expanded_trainer.writer) 
+    
+    print()
+    print("*** Training expanded agent ****")
 
     for update in range(1, args.num_updates + 1):
         # update envs each training step if leader and entry host are random (initial method to test)
-        red_agent = expanded_copy_trainer.handler.envs.envs[0].red_agent
+        red_agent = expanded_trainer.handler.envs.envs[0].red_agent
         if red_agent.leader == "random" and red_agent.entry_host == "random":
-            expanded_copy_trainer.handler.envs = expanded_copy_trainer.get_envs()  # reinitialize envs (entry host and leader will be reselected)
-        expanded_copy_trainer.train(update)
+            expanded_trainer.handler.envs = expanded_trainer.get_envs()  # reinitialize envs (entry host and leader will be reselected)
+        expanded_trainer.train(update)
 
     abstract_trainer.close()
     # expanded_probs_trainer.close()
-    expanded_copy_trainer.close()
-
-
-
-def train_approx_agents(args: YAMLConfig):
-    if args.debug_mode:
-        args.num_envs = 1
-        args.track = False
-        args.device = 'cpu'
-        args.async_env = False
-        args.experiment_name = 'DEBUG_' + args.experiment_name
-    args.batch_size = int(args.num_envs * args.num_steps)   # Number of environment steps to performa backprop with
-    args.minibatch_size = int(args.batch_size // args.num_minibatches)  # Number of environments steps to perform backprop with in each epoch
-    args.num_updates = args.total_timesteps // args.batch_size  # Total number of policy update phases
-    args.save_frequency = int(args.num_updates / args.num_saves)    # Number of policy updates between each model save and evaluation
-    if args.save_frequency == 0:
-        args.save_frequency = 1
-
-    args.experiment_name = f"{args.policy_type}RLRedAgentvsRLBlueAgent"
-    args.agents["red"] = "rl_red_agent.yaml"
-    abstract_trainer = RLTrainer(args)
-    abstract_trainer.configure_training()
-
-    print("*** Abstract agent ***")
-    abstract_trainer.handler.load_models()
-    abstract_policy = abstract_trainer.handler.agents["red"]["policy"]
-
-
-    # args.experiment_name = "TableRLExpandedProbsRedAgentvsRLBlueAgent"
-    # args.agents["red"] = "rl_red_complex.yaml"
-    # expanded_probs_trainer = RLTrainer(args)
-    # expanded_probs_trainer.configure_training()  
-    # expanded_probs_trainer.handler.get_action_mapping(files("cyberwheel.data.configs.red_agent").joinpath("rl_red_complex.yaml"))
-    # expanded_probs_trainer.handler.agents["red"]["policy"].q_table = expanded_probs_trainer.handler.expand_model(abstract_policy, "probabilities")
-    # print(f"Expanded-probabilities policy states: {len(expanded_probs_trainer.handler.agents['red']['policy'].q_table)}")
-    # expanded_probs_trainer.handler.initial_epsilon = 1.0
-    # print("Model expanded. Starting training of complex agent...")
-    
-    # print("*** Expanded Probabilities agent ****")
-
-    # for update in range(1, args.num_updates + 1):
-    #     # update envs each training step if leader and entry host are random (initial method to test)
-    #     red_agent = expanded_probs_trainer.handler.envs.envs[0].red_agent
-    #     if red_agent.leader == "random" and red_agent.entry_host == "random":
-    #         expanded_probs_trainer.handler.envs = expanded_probs_trainer.get_envs()  # reinitialize envs (entry host and leader will be reselected)
-    #     expanded_probs_trainer.train(update)
-
-    args.experiment_name = f"{args.policy_type}RLExpandedQvaluesRedAgentvsRLBlueAgent"
-    args.agents["red"] = "rl_red_complex.yaml"
-    expanded_copy_trainer = RLTrainer(args)
-    expanded_copy_trainer.configure_training()  
-    expanded_copy_trainer.handler.get_action_mapping(files("cyberwheel.data.configs.red_agent").joinpath("rl_red_complex.yaml"))
-    expanded_copy_trainer.handler.expand_model(abstract_policy, method=args.method)
-    print("Model expanded. Starting training of complex agent...")
-
-    print("*** Training Expanded Q-Values agent ****")
-
-    for update in range(1, args.num_updates + 1):
-        # update envs each training step if leader and entry host are random (initial method to test)
-        print(f"Update {update}")
-        red_agent = expanded_copy_trainer.handler.envs.envs[0].red_agent
-        if red_agent.leader == "random" and red_agent.entry_host == "random":
-            expanded_copy_trainer.handler.envs = expanded_copy_trainer.get_envs()  # reinitialize envs (entry host and leader will be reselected)
-        expanded_copy_trainer.train(update)
-
-    abstract_trainer.close()
-    # expanded_probs_trainer.close()
-    expanded_copy_trainer.close()
+    expanded_trainer.close()

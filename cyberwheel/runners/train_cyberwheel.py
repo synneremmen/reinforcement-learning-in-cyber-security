@@ -27,9 +27,21 @@ def train_cyberwheel(args: YAMLConfig):
     else:
         args.save_frequency = 1
 
+    max_net = args.network_size_compatibility
+    if args.policy_type == "table_based" and hasattr(args, "num_hosts"):
+        args.max_num_hosts = getattr(args, "num_hosts")
+    else:
+        args.max_num_hosts = 100 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
+        
+    if args.policy_type == "table_based" and hasattr(args, "num_subnets"):
+        args.max_num_subnets = getattr(args, "num_subnets")
+    else:
+        args.max_num_subnets = 10 if max_net == 'small' else 100 if max_net == 'medium' else 1000 #if max_net == 'large'
+
     # Unique experiment name if empty
     if not args.experiment_name:
-        args.experiment_name = f"{os.path.basename(__file__).rstrip('.py')}_{args.seed}_{int(time.time())}"
+        # args.experiment_name = f"{os.path.basename(__file__).rstrip('.py')}_{args.seed}_{int(time.time())}"
+        args.experiment_name = f"train-{args.policy_type}-{args.max_num_hosts}-{args.seed}"
 
     args.evaluation = False
 
@@ -44,7 +56,7 @@ def train_cyberwheel(args: YAMLConfig):
     trainer.configure_training()
 
     for update in range(1, args.num_updates + 1):
-        print(f"----- Update {update} -----")
+        # print(f"----- Update {update} -----")
         # update envs each training step if leader and entry host are random (initial method to test)
         red_agent = trainer.handler.envs.envs[0].red_agent
         if red_agent.leader == "random" and red_agent.entry_host == "random":

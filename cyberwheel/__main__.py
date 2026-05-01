@@ -1,6 +1,6 @@
 import sys
 from cyberwheel.utils import parse_default_override_args, parse_eval_override_args, parse_override_args, parse
-from cyberwheel.runners import train_cyberwheel, evaluate_cyberwheel, run_cyberwheel, run_visualization_server, train_table_agents, train_approx_agents
+from cyberwheel.runners import train_cyberwheel, evaluate_cyberwheel, run_cyberwheel, run_visualization_server, train_expanded_agents
 
 def display_help():
     sys.argv = ['']
@@ -42,13 +42,23 @@ if __name__ == "__main__":
         if mode == 'train':
             train_cyberwheel(args)
         elif mode == 'train_expansion':
-            if args.policy_type == "table_based":
-                train_table_agents(args)
-            elif args.policy_type == "qlearning":
-                train_approx_agents(args)
+            train_expanded_agents(args)
         elif mode == 'train_all':
+            """
+            Models to train
+            - Baselines, complex and abstract
+            - Table based "policy_type: table_based"
+                - "method: copy_values" Copy values from abstract agent
+                - "method: softmax" Use softmax values from abstract agent to init q_values
+                - "method: kl_divergence"???
+            - Parameterized "policy_type: q_learning"
+                - "method: copy_params" Copy parameters from abstract agent for layers with matching shapes
+                - "method: increase_depth" Keep parameters of abstract agent and add new layers with random init
+                - "method: kl_divergence" Use KL divergence loss to train expanded model to match output distribution of abstract model. Can be done with or without reusing model weights for layers with matching shapes.
+                    - "reuse_model: True/False" Whether to reuse model weights for layers with matching shapes when using KL divergence loss. Does True lead to faster convergence?  
+            """
             args = parse(config1, mode)
-            train_table_agents(args)
+            train_expanded_agents(args)
             args = parse(config2, mode)
             train_cyberwheel(args)
         elif mode == 'evaluate':

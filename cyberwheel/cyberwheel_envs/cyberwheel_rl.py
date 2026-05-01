@@ -58,16 +58,16 @@ class CyberwheelRL(gym.Env, Cyberwheel):
         )
     
     def initialize_agents(self) -> None:
-        max_net = self.args.network_size_compatibility
-        if hasattr(self.args, "num_hosts"):
-            self.args.max_num_hosts = getattr(self.args, "num_hosts")
-        else:
-            self.args.max_num_hosts = 100 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
+        # max_net = self.args.network_size_compatibility
+        # if self.args.policy_type == "table_based" and hasattr(self.args, "num_hosts"):
+        #     self.args.max_num_hosts = getattr(self.args, "num_hosts")
+        # else:
+        #     self.args.max_num_hosts = 100 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
             
-        if hasattr(self.args, "num_subnets"):
-            self.args.max_num_subnets = getattr(self.args, "num_subnets")
-        else:
-            self.args.max_num_subnets = 10 if max_net == 'small' else 100 if max_net == 'medium' else 1000 #if max_net == 'large'
+        # if self.args.policy_type == "table_based" and hasattr(self.args, "num_subnets"):
+        #     self.args.max_num_subnets = getattr(self.args, "num_subnets")
+        # else:
+        #     self.args.max_num_subnets = 10 if max_net == 'small' else 100 if max_net == 'medium' else 1000 #if max_net == 'large'
 
         self.blue_agent = getattr(blue_agents, self.args.agent_config["blue"]["class"])(network=self.network, args=self.args)
         self.red_agent = getattr(red_agents, self.args.agent_config["red"]["class"])(network=self.network, args=self.args)
