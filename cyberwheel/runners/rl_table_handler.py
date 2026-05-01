@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from cyberwheel.utils import RLPolicyTableBased
+from cyberwheel.utils import RLPolicyTabular
 from gymnasium.vector import VectorEnv, AsyncVectorEnv
 
 from importlib.resources import files
@@ -27,7 +27,7 @@ class RLTableHandler:
         for agent in agents:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
-            self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], self.args)
+            self.agents[agent]["policy"] = RLPolicyTabular(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], self.args)
 
         if self.load:
             self.load_models()

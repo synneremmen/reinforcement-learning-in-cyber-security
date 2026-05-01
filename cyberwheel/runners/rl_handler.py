@@ -1,6 +1,6 @@
 from torch import nn, optim
 
-from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTableBased, RLPolicyQLearning
+from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTabular, RLPolicyParameterized
 from gymnasium.vector import VectorEnv, AsyncVectorEnv
 
 from importlib.resources import files
@@ -23,16 +23,16 @@ class RLHandler:
         #print(agents)
         self.agents = {}
         self.static_agents = static_agents
-        if self.args.policy_type not in ["actor_critic", "table_based", "qlearning"]:
-            raise ValueError(f"Invalid policy type '{self.args.policy_type}'. Must be either 'actor_critic', 'table_based', or 'qlearning'.")
+        if self.args.policy_type not in ["actor_critic", "tabular", "parameterized"]:
+            raise ValueError(f"Invalid policy type '{self.args.policy_type}'. Must be either 'actor_critic', 'tabular', or 'parameterized'.")
 
         for agent in agents:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
-            if self.args.policy_type == "table_based":
-                self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], device=self.device)
-            elif self.args.policy_type == "qlearning":
-                self.agents[agent]["policy"] = RLPolicyQLearning(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], device=self.device)
+            if self.args.policy_type == "tabular":
+                self.agents[agent]["policy"] = RLPolicyTabular(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], device=self.device)
+            elif self.args.policy_type == "parameterized":
+                self.agents[agent]["policy"] = RLPolicyParameterized(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], device=self.device)
             else:
                 self.agents[agent]["policy"] = RLPolicyActorCritic(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"]).to(self.device)
                 self.agents[agent]["optimizer"] = optim.Adam([
@@ -174,7 +174,7 @@ class RLHandler:
             newvalue = self.agents[agent]["newvalue"].view(-1)
             # Calculate the MSE loss between the returns and the value predictions of the critic
             # Clipping V loss is often not necessary and arguably worse in practice
-            if self.args.clip_vloss and not isinstance(self.agents[agent]["policy"], RLPolicyTableBased):
+            if self.args.clip_vloss and not isinstance(self.agents[agent]["policy"], RLPolicyTabular):
                 v_loss_unclipped = (newvalue - self.agents[agent]["batched"]["returns"][mb_inds]) ** 2
                 v_clipped = self.agents[agent]["batched"]["values"][mb_inds] + torch.clamp(
                     newvalue - self.agents[agent]["batched"]["values"][mb_inds],

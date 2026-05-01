@@ -1,7 +1,7 @@
 
 from collections import defaultdict
 from cyberwheel.network.network_generation.random_network_generator import generate_random_networks
-from cyberwheel.utils.rl_policy import RLPolicyTableBased, RLPolicyQLearning, RLPolicyActorCritic
+from cyberwheel.utils.rl_policy import RLPolicyTabular, RLPolicyParameterized, RLPolicyActorCritic
 import gymnasium as gym
 import time
 import importlib
@@ -48,7 +48,7 @@ class RLEvaluator(RLTrainer):
         # Load networks from yaml here
         network_configs = []
         if self.args.network_config is None:
-            if self.args.policy_type == "table_based":
+            if self.args.policy_type == "tabular":
                 t = "table"
             else: 
                 t = ""
@@ -110,8 +110,8 @@ class RLEvaluator(RLTrainer):
                 load_path = files("content.drive.MyDrive.RLCS.models").joinpath(self.args.experiment_name)
             else:
                 load_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
-            if self.args.policy_type == "table_based":
-                self.policy[agent] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape, self.args)
+            if self.args.policy_type == "tabular":
+                self.policy[agent] = RLPolicyTabular(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape, self.args)
                 save_dict = torch.load(
                                 load_path.joinpath(agent_filename),
                                 map_location=self.device,
@@ -124,8 +124,8 @@ class RLEvaluator(RLTrainer):
                 )
                 self.policy[agent].q_table.update(q_table_dict)
                 
-            elif self.args.policy_type == "qlearning":
-                self.policy[agent] = RLPolicyQLearning(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape, eval=True).to(self.device)
+            elif self.args.policy_type == "parameterized":
+                self.policy[agent] = RLPolicyParameterized(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape, eval=True).to(self.device)
                 state_dict = torch.load(
                     load_path.joinpath(agent_filename),
                     map_location=self.device,

@@ -4,7 +4,7 @@ from pathlib import Path
 from torch import optim
 from torch.optim.lr_scheduler import PolynomialLR
 
-from cyberwheel.utils import RLPolicyQLearning
+from cyberwheel.utils import RLPolicyParameterized
 from gymnasium.vector import VectorEnv
 
 from importlib.resources import files
@@ -13,7 +13,7 @@ import numpy as np
 import torch
 import os
 
-class RLQHandler:
+class RLParamHandler:
 
     def __init__(self, envs: VectorEnv, args, agents: dict, static_agents=[]):
         self.envs = envs
@@ -33,7 +33,7 @@ class RLQHandler:
         for agent in agents:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
-            self.agents[agent]["policy"] = RLPolicyQLearning(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], use_target=self.args.use_target).to(self.device)
+            self.agents[agent]["policy"] = RLPolicyParameterized(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], use_target=self.args.use_target).to(self.device)
             self.agents[agent]["optimizer"] = optim.Adam([
                 { 'params': list(self.agents[agent]["policy"].model.parameters()),  'lr': float(self.args.learning_rate),  'eps': 1e-3 },
             ])
@@ -318,7 +318,7 @@ class RLQHandler:
             if os.path.exists(agent_path):
                 checkpoint = torch.load(agent_path, map_location=torch.device(self.device))
                 state_dict = checkpoint["state_dict"] if isinstance(checkpoint, dict) and "state_dict" in checkpoint else checkpoint
-                inferred_hidden_layers = RLPolicyQLearning.hidden_layers_from_state_dict(state_dict)
+                inferred_hidden_layers = RLPolicyParameterized.hidden_layers_from_state_dict(state_dict)
                 print(f"Inferred hidden layers from state_dict: {inferred_hidden_layers}")
                 hidden_layers = None
                 if isinstance(checkpoint, dict):
@@ -331,7 +331,7 @@ class RLQHandler:
 
                 policy = self.agents[agent]["policy"]
                 if list(policy.hidden_layers) != list(hidden_layers):
-                    self.agents[agent]["policy"] = RLPolicyQLearning(
+                    self.agents[agent]["policy"] = RLPolicyParameterized(
                         action_space_shape=policy.action_space_shape,
                         obs_space_shape=policy.obs_space_shape,
                         epsilon=policy.epsilon,

@@ -14,8 +14,8 @@ from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 from importlib.resources import files
 
-from cyberwheel.runners.rl_q_handler import RLQHandler
-from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTableBased, RLPolicyQLearning
+from cyberwheel.runners.rl_q_handler import RLParamHandler
+from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTabular, RLPolicyParameterized
 from cyberwheel.utils.get_service_map import get_service_map
 from cyberwheel.utils.set_seed import set_seed
 from cyberwheel.runners.rl_handler import RLHandler
@@ -147,12 +147,12 @@ class RLTrainer:
                 # Load the agent
 
                 if isinstance(self.handler, RLTableHandler):
-                    eval_agent = RLPolicyTableBased(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"], args=self.args)
+                    eval_agent = RLPolicyTabular(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"], args=self.args)
                     eval_agent.q_table = loaded_models[agent]
-                elif isinstance(self.handler, RLQHandler):
+                elif isinstance(self.handler, RLParamHandler):
                     checkpoint = loaded_models[agent]
                     state_dict = checkpoint["state_dict"] if isinstance(checkpoint, dict) and "state_dict" in checkpoint else checkpoint
-                    hidden_layers = RLPolicyQLearning.hidden_layers_from_state_dict(state_dict)
+                    hidden_layers = RLPolicyParameterized.hidden_layers_from_state_dict(state_dict)
                     if isinstance(checkpoint, dict):
                         checkpoint_hidden_layers = checkpoint.get("architecture", {}).get("hidden_layers")
                         if checkpoint_hidden_layers is not None and list(checkpoint_hidden_layers) != list(hidden_layers):
@@ -161,7 +161,7 @@ class RLTrainer:
                                 f"state_dict architecture {hidden_layers}. Using the inferred architecture."
                             )
 
-                    eval_agent = RLPolicyQLearning(
+                    eval_agent = RLPolicyParameterized(
                         action_space_shape=self.handler.agents[agent]["max_action_space_size"],
                         obs_space_shape=self.handler.agents[agent]["shape"],
                         use_target=False, # evaluating, no target model required
@@ -252,10 +252,10 @@ class RLTrainer:
         self.envs = self.get_envs()
         # Create agent and optimizer
 
-        if self.args.policy_type == "table_based":
+        if self.args.policy_type == "tabular":
             self.handler = RLTableHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
-        elif self.args.policy_type == "qlearning":
-            self.handler = RLQHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
+        elif self.args.policy_type == "parameterized":
+            self.handler = RLParamHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
         else:
             self.handler = RLHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)
 
@@ -266,7 +266,7 @@ class RLTrainer:
             # Load randomly generated networks
             self.networks = {}
             # print("Generating random networks...")
-            if self.args.policy_type == "table_based":
+            if self.args.policy_type == "tabular":
                 t = "table"
             else: 
                 t = ""
@@ -358,7 +358,7 @@ class RLTrainer:
         self.handler.log_stuff(self.writer, episode_time, episode_process_time)
         
         # Calculate advantages used to optimize the policy and returns which are compared to values to optimize the critic.
-        if isinstance(self.handler, (RLHandler, RLQHandler)):
+        if isinstance(self.handler, (RLHandler, RLParamHandler)):
             if self.args.policy_type == "actor_critic":
                 self.handler.compute_gae()
 

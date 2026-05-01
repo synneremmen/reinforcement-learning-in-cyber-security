@@ -1,5 +1,5 @@
 # Training Parameters
-experiment_name: # qlearningRLRedAgentvsRLBlueAgent #TrainRedAgent_TwoLRs_AnnealonUpdate_BothHigh_ActionMask #EmulatorIntegrationCampaign_FixedTypeObs
+experiment_name: #TrainRedAgent_TwoLRs_AnnealonUpdate_BothHigh_ActionMask #EmulatorIntegrationCampaign_FixedTypeObs
 deterministic: true # Whether or not the training is deterministic
 seed: 1001
 device: cpu # Which device to train on
@@ -39,7 +39,7 @@ agents:
   red: rl_red_agent.yaml
   # red: rl_red_agent.yaml
 
-policy_type: qlearning
+policy_type: parameterized
 method: copy_values # copy_values, softmax, kl_divergence, copy_params, increase_depth
 expand_teacher_probs: false
 kl_divergence_steps: 1000

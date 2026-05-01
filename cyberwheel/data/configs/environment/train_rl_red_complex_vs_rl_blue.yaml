@@ -33,7 +33,7 @@ agents:
   # red: rl_red_agent.yaml
   # red: rl_red_complex.yaml
   red: rl_red_complex.yaml
-policy_type: table_based # actor_critic
+policy_type: tabular # actor_critic
 
 valid_targets: servers
 reward_function: RLReward # The reward function

@@ -47,11 +47,11 @@ if __name__ == "__main__":
             """
             Models to train
             - Baselines, complex and abstract
-            - Table based "policy_type: table_based"
+            - Table based "policy_type: tabluar"
                 - "method: copy_values" Copy values from abstract agent
                 - "method: softmax" Use softmax values from abstract agent to init q_values
                 - "method: kl_divergence"???
-            - Parameterized "policy_type: q_learning"
+            - Parameterized "policy_type: parameterized"
                 - "method: copy_params" Copy parameters from abstract agent for layers with matching shapes
                 - "method: increase_depth" Keep parameters of abstract agent and add new layers with random init
                 - "method: kl_divergence" Use KL divergence loss to train expanded model to match output distribution of abstract model. Can be done with or without reusing model weights for layers with matching shapes.

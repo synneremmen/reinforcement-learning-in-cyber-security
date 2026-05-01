@@ -65,11 +65,11 @@ class RLPolicyActorCritic(nn.Module):
         return action, probs.log_prob(action), probs.entropy(), self.critic(obs)
     
 
-class RLPolicyQLearning(nn.Module):
+class RLPolicyParameterized(nn.Module):
     def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.2, use_target=True, eval=False, hidden_layers=None):
         super().__init__()
         obs_space_shape = int(np.array(obs_space_shape).prod())
-        print(f"Initializing Q-learning policy with obs space shape {obs_space_shape} and action space shape {action_space_shape}")
+        print(f"Initializing parameterized policy with obs space shape {obs_space_shape} and action space shape {action_space_shape}")
         self.device = torch.device("cpu") # "cuda" if torch.cuda.is_available() else
         self.obs_space_shape = obs_space_shape
         self.action_space_shape = action_space_shape
@@ -265,7 +265,7 @@ class RLPolicyQLearning(nn.Module):
         self.target_model.load_state_dict(self.model.state_dict())
         self.target_model.eval()
 
-class RLPolicyTableBased(nn.Module): 
+class RLPolicyTabular(nn.Module): 
     """
     TODO: Add header∂s
     """
