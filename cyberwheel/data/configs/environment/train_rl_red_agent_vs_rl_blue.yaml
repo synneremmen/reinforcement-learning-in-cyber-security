@@ -36,7 +36,7 @@ agents:
   # blue: rl_blue_agent.yaml
   # red: rl_red_campaign.yaml
   # red: rl_red_agent.yaml
-  red: rl_red_abstract.yaml
+  red: rl_red_agent.yaml
   # red: rl_red_agent.yaml
 
 policy_type: table-based
