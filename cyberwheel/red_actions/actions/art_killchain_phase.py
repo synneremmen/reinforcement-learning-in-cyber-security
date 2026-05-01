@@ -244,18 +244,19 @@ class ARTKillChainPhase(ARTAction):
 
             # use own specified mapping for techniques to present varying vulnerabilities across host types. 
             # if no mapping for this host type, use os matched candidates
-            allowed_techniques = get_allowed_techniques(str(host.host_type.type._name_), self.name)
+            # allowed_techniques = get_allowed_techniques(str(host.host_type.type._name_), self.name)
             
-            if allowed_techniques:
-                # only use techniques mapped to this host type + phase
-                filtered_candidates = [
-                    (mid, at, t) for mid, at, t in candidates
-                    if mid in allowed_techniques
-                ]
-                if filtered_candidates:
-                    candidates = filtered_candidates
-                else:
-                    print(f"No techniques allowed for {host.host_type} in phase {self.name} on host {host.name}")
+            # if allowed_techniques:
+            #     print(f"Allowed techniques for host in phase {self.name}: {allowed_techniques}")
+            #     # only use techniques mapped to this host type + phase
+            #     filtered_candidates = [
+            #         (mid, at, t) for mid, at, t in candidates
+            #         if mid in allowed_techniques
+            #     ]
+            #     if filtered_candidates:
+            #         candidates = filtered_candidates
+            #     else:
+            #         print(f"No techniques allowed for {host} in phase {self.name} on host {host.name}")
 
             if len(candidates) == 0:
                 print(f"No valid techniques found for host {host.name} of type {host.host_type} and action {self.name}, failing action")
