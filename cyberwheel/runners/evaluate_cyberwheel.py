@@ -14,12 +14,22 @@ def evaluate_cyberwheel(args: YAMLConfig, emulate=False):
     #signal.pause()
     args.evaluation = True
 
-
+    max_net = args.network_size_compatibility
+    if args.policy_type == "table_based" and hasattr(args, "num_hosts"):
+        args.max_num_hosts = getattr(args, "num_hosts")
+    else:
+        args.max_num_hosts = 100 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
+        
+    if args.policy_type == "table_based" and hasattr(args, "num_subnets"):
+        args.max_num_subnets = getattr(args, "num_subnets")
+    else:
+        args.max_num_subnets = 10 if max_net == 'small' else 100 if max_net == 'medium' else 1000 # if max_net == 'large'
 
     # Initialize the Evaluator object
     evaluator = RLEvaluator(args) #EmulatorEvaluator(args) if emulate else Evaluator(args)
 
     # Configure training parameters and train
+    
     
     evaluator.configure_evaluation()
 
