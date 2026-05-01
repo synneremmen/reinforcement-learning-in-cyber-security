@@ -39,7 +39,7 @@ agents:
   red: rl_red_agent.yaml
   # red: rl_red_agent.yaml
 
-policy_type: table-based
+policy_type: table_based
 method: copy_values # copy_values, softmax, kl_divergence, copy_params, increase_depth
 expand_teacher_probs: false
 kl_divergence_steps: 1000
