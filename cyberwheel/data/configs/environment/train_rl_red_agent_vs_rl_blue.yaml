@@ -4,7 +4,7 @@ deterministic: true # Whether or not the training is deterministic
 seed: 1001
 device: cpu # Which device to train on
 async_env: false # Whether to run the environments in parallel
-total_timesteps: 10000000 # Total number of steps to run throughout training
+total_timesteps: 50000000 # Total number of steps to run throughout training
 num_saves: 10 # Number of times the model is evaluated and saved during the training run
 num_envs: 1 # Number of game environments to run at once (parallel if async_env == true)
 num_steps: 50 # Number of steps to run per episode
@@ -15,7 +15,7 @@ decay_epsilon: false
 decay_rate: 0.001
 alpha: 0.1
 drive: false
-nrec: false
+nrec: true
 eval: false
 
 num_hosts: 6
@@ -36,10 +36,10 @@ agents:
   # blue: rl_blue_agent.yaml
   # red: rl_red_campaign.yaml
   # red: rl_red_agent.yaml
-  red: rl_red_complex.yaml
+  red: rl_red_abstract.yaml
   # red: rl_red_agent.yaml
 
-policy_type: qlearning
+policy_type: table-based
 method: copy_values # copy_values, softmax, kl_divergence, copy_params, increase_depth
 expand_teacher_probs: false
 kl_divergence_steps: 1000
