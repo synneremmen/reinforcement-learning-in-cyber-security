@@ -244,11 +244,11 @@ class RLParamHandler:
             obs = self.agents[agent]["batched"]["obs"][mb_inds]
             next_obs = self.agents[agent]["batched"]["next_obses"][mb_inds]
             actions = self.agents[agent]["batched"]["actions"][mb_inds].long()
-            next_action_masks = self.agents[agent]["batched"]["next_action_masks"][mb_inds]
-            q_values = self.agents[agent]["policy"].get_value(obs, actions)
+            next_action_masks = self.agents[agent]["batched"]["next_action_masks"][mb_inds] 
+            q_values = self.agents[agent]["policy"].get_value(obs, actions, use_target=False)
             
             with torch.no_grad():
-                next_q_values = self.agents[agent]["policy"].get_value(next_obs, action_mask=next_action_masks)
+                next_q_values = self.agents[agent]["policy"].get_value(next_obs, action_mask=next_action_masks, use_target=True)
             
             rewards = self.agents[agent]["batched"]["rewards"][mb_inds]
             dones = self.agents[agent]["batched"]["dones"][mb_inds]
@@ -257,7 +257,6 @@ class RLParamHandler:
                 raise ValueError(f"Unexpected dimensions - obs: {obs.shape}, actions: {actions.shape}, rewards: {rewards.shape}, dones: {dones.shape}, q_values: {q_values.shape}, next_q_values: {next_q_values.shape}, next_action_masks: {next_action_masks.shape}")
             
             target = rewards + (1 - dones) * self.args.gamma * next_q_values
-            # moving target... instable learning
             self.agents[agent]["loss"] = self.agents[agent]["lossfn"](q_values, target)
 
     def backpropagate(self, update):

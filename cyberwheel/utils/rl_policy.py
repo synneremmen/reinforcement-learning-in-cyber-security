@@ -124,8 +124,10 @@ class RLPolicyParameterized(nn.Module):
         for tp, sp in zip(self.target_model.parameters(), self.model.parameters()):
             tp.data.copy_((1 - self.tau) * tp.data + self.tau * sp.data)
 
-    def get_value(self, obs, action=None, action_mask=None):
-        q_values = self.model(obs)
+    def get_value(self, obs, action=None, action_mask=None, use_target=False):
+        """Get Q-values using either main or target network. use_target=True for bootstrapping in DQN."""
+        model = self.target_model if use_target and self.use_target else self.model
+        q_values = model(obs)
         if action_mask is not None:
             q_values = q_values.clone()
             q_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)] = float("-inf")

@@ -28,12 +28,12 @@ def train_cyberwheel(args: YAMLConfig):
         args.save_frequency = 1
 
     max_net = args.network_size_compatibility
-    if args.policy_type == "tabular" and hasattr(args, "num_hosts"):
+    if hasattr(args, "num_hosts"):
         args.max_num_hosts = getattr(args, "num_hosts")
     else:
         args.max_num_hosts = 100 if max_net == 'small' else 1000 if max_net == 'medium' else 10000 # if max_net == 'large'
         
-    if args.policy_type == "tabular" and hasattr(args, "num_subnets"):
+    if hasattr(args, "num_subnets"):
         args.max_num_subnets = getattr(args, "num_subnets")
     else:
         args.max_num_subnets = 10 if max_net == 'small' else 100 if max_net == 'medium' else 1000 #if max_net == 'large'
