@@ -13,6 +13,7 @@ import random
 import yaml
 
 from importlib.resources import files
+from pathlib import Path
 from tqdm import tqdm
 
 from cyberwheel.network.network_base import Network
@@ -104,7 +105,7 @@ class RLEvaluator(RLTrainer):
                     files("cyberwheel.data.models").joinpath(self.args.experiment_name), exist_ok=True
                 )
             if self.args.nrec:
-                load_path = files("persistent01.cyberwheel.data.models").joinpath(self.args.experiment_name)
+                load_path = Path("/persistent01/cyberwheel/models") / self.args.experiment_name
             elif self.args.drive:
                 load_path = files("content.drive.MyDrive.RLCS.models").joinpath(self.args.experiment_name)
             else:

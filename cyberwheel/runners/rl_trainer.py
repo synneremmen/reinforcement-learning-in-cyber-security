@@ -210,7 +210,7 @@ class RLTrainer:
 
     def configure_training(self):
         if self.args.nrec:
-            run_path = files("persistent01.cyberwheel.data.runs").joinpath(self.args.experiment_name)
+            run_path = Path("/persistent01/cyberwheel/runs") / self.args.experiment_name
         elif self.args.drive:
             run_path = Path(files("content.drive.MyDrive.RLCS.runs").joinpath(self.args.experiment_name))
         else:

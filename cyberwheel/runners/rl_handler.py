@@ -4,6 +4,7 @@ from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTableBased, RLPolicyQL
 from gymnasium.vector import VectorEnv, AsyncVectorEnv
 
 from importlib.resources import files
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -220,7 +221,7 @@ class RLHandler:
     
     def save_models(self):
         if self.args.nrec:
-            run_path = files("persistent01.cyberwheel.data.models").joinpath(self.args.experiment_name)
+            run_path = Path("/persistent01/cyberwheel/models") / self.args.experiment_name
         elif self.args.drive:
             run_path = files("content.drive.MyDrive.RLCS.models").joinpath(self.args.experiment_name)
         else:

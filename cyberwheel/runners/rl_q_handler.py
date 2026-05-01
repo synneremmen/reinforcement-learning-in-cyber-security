@@ -272,7 +272,7 @@ class RLQHandler:
 
     def save_models(self):
         if self.args.nrec:
-            run_path = files("persistent01.cyberwheel.data.models").joinpath(self.args.experiment_name)
+            run_path = Path("/persistent01/cyberwheel/models") / self.args.experiment_name
         elif self.args.drive:
             run_path = files("content.drive.MyDrive.RLCS.models").joinpath(self.args.experiment_name)
         else:
@@ -307,7 +307,7 @@ class RLQHandler:
         """Load Q-tables from disk"""
         for agent in self.agents:
             if self.args.nrec:
-                load_path = files("persistent01.cyberwheel.data.models").joinpath(self.args.experiment_name)
+                load_path = Path("/persistent01/cyberwheel/models") / self.args.experiment_name
             elif self.args.drive:
                 load_path = Path(str(files("content.drive.MyDrive.RLCS.models").joinpath(self.args.experiment_name)))
             else:
