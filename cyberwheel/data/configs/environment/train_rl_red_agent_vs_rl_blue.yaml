@@ -1,5 +1,5 @@
 # Training Parameters
-experiment_name: TableRLRedAgentvsRLBlueAgent #TrainRedAgent_TwoLRs_AnnealonUpdate_BothHigh_ActionMask #EmulatorIntegrationCampaign_FixedTypeObs
+experiment_name: # qlearningRLRedAgentvsRLBlueAgent #TrainRedAgent_TwoLRs_AnnealonUpdate_BothHigh_ActionMask #EmulatorIntegrationCampaign_FixedTypeObs
 deterministic: true # Whether or not the training is deterministic
 seed: 1001
 device: cpu # Which device to train on
@@ -7,14 +7,19 @@ async_env: false # Whether to run the environments in parallel
 total_timesteps: 10000000 # Total number of steps to run throughout training
 num_saves: 10 # Number of times the model is evaluated and saved during the training run
 num_envs: 1 # Number of game environments to run at once (parallel if async_env == true)
-num_steps: 30 # Number of steps to run per episode
-eval_episodes: 5 # Number of episodes to run in an evaluation
+num_steps: 50 # Number of steps to run per episode
+eval_episodes: 10 # Number of episodes to run in an evaluation
 debug_mode: false
 epsilon: 0.2
 decay_epsilon: false
+decay_rate: 0.001
 alpha: 0.1
 drive: false
-nrec: true
+nrec: false
+eval: false
+
+num_hosts: 6
+num_subnets: 2
 
 # Environment Parameters
 environment: CyberwheelRL # Environment class to use
@@ -31,9 +36,16 @@ agents:
   # blue: rl_blue_agent.yaml
   # red: rl_red_campaign.yaml
   # red: rl_red_agent.yaml
-  # red: rl_red_complex.yaml
-  red: rl_red_agent.yaml
-policy_type: table_based # table_based # actor_critic
+  red: rl_red_complex.yaml
+  # red: rl_red_agent.yaml
+
+policy_type: qlearning
+method: copy_values # copy_values, softmax, kl_divergence, copy_params, increase_depth
+expand_teacher_probs: false
+kl_divergence_steps: 1000
+reuse_model: false
+
+use_target: true
 
 valid_targets: servers
 reward_function: RLReward # The reward function
@@ -45,7 +57,7 @@ max_decoys: 5
 
 # RL Parameters
 env_id: cyberwheel # Environment ID
-learning_rate: 0.1 # Learning rate value of the optimizer
+learning_rate: 0.01 # Learning rate value of the optimizer
 actor_lr: 2.5e-4
 critic_lr: 2.5e-4
 anneal_lr: cosine_restarts # Whether or not to anneal the learning rate for policy and value networks
