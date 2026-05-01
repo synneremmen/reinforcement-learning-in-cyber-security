@@ -41,7 +41,8 @@ def train_cyberwheel(args: YAMLConfig):
     # Unique experiment name if empty
     if not args.experiment_name:
         # args.experiment_name = f"{os.path.basename(__file__).rstrip('.py')}_{args.seed}_{int(time.time())}"
-        args.experiment_name = f"train-{args.policy_type}-{args.max_num_hosts}-{args.seed}"
+        agent = '-' + args.agents['red'].split('.')[0] if args.agents['red'] else ''
+        args.experiment_name = f"train-{args.policy_type}{agent}-{args.max_num_hosts}-{args.seed}"
 
     args.evaluation = False
 
