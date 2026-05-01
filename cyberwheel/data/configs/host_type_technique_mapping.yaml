@@ -1,0 +1,159 @@
+# Host Type to Technique Mapping Configuration
+# Maps server types to allowed MITRE techniques per kill chain phase
+# 
+# This enables server-type-specific attack constraints:
+# - WEB_SERVER: web-specific discovery, lateral movement, and impact
+# - MAIL_SERVER: mail/exchange-specific techniques
+# - FILE_SERVER: SMB/file-share-specific techniques
+# - PROXY_SERVER: network interception and proxy-specific techniques
+# - SSH_JUMP_SERVER: SSH-specific techniques
+#
+# Phases: discovery, lateral_movement, privilege_escalation, impact
+
+WEB_SERVER:
+  discovery:
+    - T1087.002  # Gather Victim Identity - Domain Account
+    # - T1046      # Network Service Discovery - Portscan
+    - T1083      # File and Directory Discovery
+    - T1217      # Browser History
+    - T1049      # System Network Connections Discovery
+    - T1016      # System Network Configuration Discovery
+    - T1082      # System Information Discovery
+    - T1057      # Process Discovery
+    # - T1018      # Remote System Discovery - PingSweep
+  lateral-movement:
+    - T1021.003  # Remote Services: RDP
+    - T1570      # Lateral Tool Transfer
+    - T1550.002  # Use Alternate Authentication Material: Pass the Hash
+    - T1550.003  # Use Alternate Authentication Material: Pass the Ticket
+    - T1091      # Replication Through Removable Media
+    # - T1563.002 # ----
+  privilege-escalation:
+    - T1546.008  # Event Triggered Execution: Accessibility Features
+    - T1546.009  # Event Triggered Execution: AppInit DLLs
+    - T1546.010  # Event Triggered Execution: Application Shimming
+    - T1546.011  # Event Triggered Execution: Application Shimming
+    - T1055.004  # Process Injection: Asynchronous Procedure Call
+    - T1053.002  # Scheduled Task/Job: At (Windows)
+    - T1547.002  # Boot or Logon Autostart Execution: Registry Run Keys
+    - T1548.002  # Abuse Elevation Control Mechanism: Bypass User Account Control
+    - T1574.012  # Hijack Execution Flow: COR_PROFILER
+    - T1546.001  # Event Triggered Execution: Change Default File Association
+    - T1055.001  # Process Injection: Dynamic-link Library Injection
+    - T1574.001  # Hijack Execution Flow: DLL Search Order Hijacking
+    - T1574.002  # Hijack Execution Flow: DLL Side-Loading
+    - T1055.011  # Process Injection: Extra Window Memory Injection
+    - T1546.012  # Event Triggered Execution: Image File Execution Options Injection
+  impact:
+    - T1486      # Data Encrypted for Impact
+    - T1490      # Inhibit System Recovery
+    - T1491.001  # Defacement: Internal Defacement
+    - T1489      # Service Stop
+
+MAIL_SERVER:
+  discovery:
+    - T1087.001  # Gather Victim Identity - Local Account
+    # - T1046      # Network Service Discovery - Portscan
+    - T1083      # File and Directory Discovery
+    - T1482      # Domain Trust Discovery
+    - T1069.001  # Permission Groups Discovery - Local Groups
+    - T1201      # Password Policy Discovery
+    - T1057      # Process Discovery
+  lateral-movement:
+    - T1021.001  # Remote Services: SSH
+    - T1570      # Lateral Tool Transfer
+    - T1563.002  # Remote Service Session Hijacking: SSH
+    - T1091      # Replication Through Removable Media
+  privilege-escalation:
+    - T1078.001  # Valid Accounts: Default Accounts
+    - T1548.002  # Abuse Elevation Control Mechanism: Bypass User Account Control
+    - T1574.012  # Hijack Execution Flow: COR_PROFILER
+    - T1055.001  # Process Injection: Dynamic-link Library Injection
+    - T1547.002  # Boot or Logon Autostart Execution: Registry Run Keys
+    - T1546.001  # Event Triggered Execution: Change Default File Association
+    - T1053.005  # Scheduled Task/Job: Scheduled Task
+  impact:
+    - T1485      # Data Destruction
+    - T1486      # Data Encrypted for Impact
+    - T1531      # Account Access Removal
+    # - T1491.001
+
+FILE_SERVER:
+  discovery:
+    - T1083      # File and Directory Discovery
+    - T1087.002  # Gather Victim Identity - Domain Account
+    # - T1046      # Network Service Discovery - Portscan
+    - T1049      # System Network Connections Discovery
+    - T1082      # System Information Discovery
+    - T1057      # Process Discovery
+  lateral-movement:
+    - T1021.002  # Remote Services: SMB/Windows Admin Shares
+    - T1570      # Lateral Tool Transfer
+    - T1550.002  # Use Alternate Authentication Material: Pass the Hash
+    - T1550.003  # Use Alternate Authentication Material: Pass the Ticket
+    - T1021.006  # Remote Services: Windows Remote Management
+    # - T1563.002 # ----
+  privilege-escalation:
+    - T1053.005  # Scheduled Task/Job: Scheduled Task
+    - T1546.001  # Event Triggered Execution: Change Default File Association
+    - T1574.012  # Hijack Execution Flow: COR_PROFILER
+    - T1055.001  # Process Injection: Dynamic-link Library Injection
+    - T1548.002  # Abuse Elevation Control Mechanism: Bypass User Account Control
+    - T1547.002  # Boot or Logon Autostart Execution: Registry Run Keys
+    - T1055.004  # Process Injection: Asynchronous Procedure Call
+  impact:
+    - T1485      # Data Destruction
+    - T1486      # Data Encrypted for Impact
+    # - T1491.001
+
+PROXY_SERVER:
+  discovery:
+    - T1040      # Network Traffic Sniffing
+    - T1049      # System Network Connections Discovery
+    # - T1046      # Network Service Discovery - Portscan
+    - T1087.002  # Gather Victim Identity - Domain Account
+    - T1083      # File and Directory Discovery
+    - T1082      # System Information Discovery
+  lateral-movement:
+    - T1040      # Network Traffic Sniffing
+    - T1021.003  # Remote Services: RDP
+    - T1570      # Lateral Tool Transfer
+    - T1550.002  # Use Alternate Authentication Material: Pass the Hash
+    - T1550.003  # Use Alternate Authentication Material: Pass the Ticket
+  privilege-escalation:
+    - T1078.001  # Valid Accounts: Default Accounts
+    - T1548.002  # Abuse Elevation Control Mechanism: Bypass User Account Control
+    - T1055.001  # Process Injection: Dynamic-link Library Injection
+    - T1546.008  # Event Triggered Execution: Accessibility Features
+    - T1574.012  # Hijack Execution Flow: COR_PROFILER
+  impact:
+    - T1489      # Service Stop
+    - T1491.001  # Defacement: Internal Defacement
+    - T1490      # Inhibit System Recovery
+
+SSH_JUMP_SERVER:
+  discovery:
+    # - T1046      # Network Service Discovery - Portscan
+    - T1083      # File and Directory Discovery
+    - T1087.001  # Gather Victim Identity - Local Account
+    - T1087.002  # Gather Victim Identity - Domain Account
+    - T1057      # Process Discovery
+    - T1082      # System Information Discovery
+  lateral-movement:
+    - T1021.001  # Remote Services: SSH
+    - T1570      # Lateral Tool Transfer
+    - T1550.002  # Use Alternate Authentication Material: Pass the Hash
+    - T1550.003  # Use Alternate Authentication Material: Pass the Ticket
+  privilege-escalation:
+    - T1078.001  # Valid Accounts: Default Accounts
+    - T1548.001  # Abuse Elevation Control Mechanism: Setuid and Setgid
+    - T1548.003  # Abuse Elevation Control Mechanism: Sudo and Sudo Caching
+    - T1546.004  # Event Triggered Execution: Unix Shell Configuration Modification
+    - T1546.005  # Event Triggered Execution: Trap
+    - T1053.002  # Scheduled Task/Job: At (Windows)
+    - T1053.005  # Scheduled Task/Job: Scheduled Task
+  impact:
+    - T1529      # System Shutdown/Reboot
+    - T1490      # Inhibit System Recovery
+    - T1486      # Data Encrypted for Impact
+    # - T1491.001

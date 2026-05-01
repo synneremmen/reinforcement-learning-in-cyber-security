@@ -55,7 +55,7 @@ class Service(BaseModel):
     @classmethod
     def create_service_from_dict(cls: Type[T], service: dict[str, Any]) -> T:
         # instantiate any defined Vulns
-        vulns = service.get("cve", [])
+        vulns = service.get("cve") or []
         # vulns = [cls.create_vuln_from_list(v) for v in service_vulns]
 
         version = service.get("version")
@@ -77,7 +77,7 @@ class Service(BaseModel):
     ) -> T:
         # instantiate any defined Vulns
         service = service_objs.get(service_str, {})
-        vulns = service.get("cve", set())
+        vulns = service.get("cve") or []
         # vulns = [cls.create_vuln_from_list(v) for v in service_vulns]
         
         version = service.get("version")

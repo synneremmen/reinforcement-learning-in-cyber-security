@@ -1,6 +1,7 @@
 from cyberwheel.red_actions import art_techniques
 from cyberwheel.red_actions.red_base import ARTAction
 from cyberwheel.network.host import Host
+from cyberwheel.utils.technique_config import get_allowed_techniques
 
 import cyberwheel.red_actions.art_techniques as art_techniques
 import random
@@ -241,7 +242,23 @@ class ARTKillChainPhase(ARTAction):
                         continue
                     candidates.append((mitre_id, art_technique, at))
 
+            # use own specified mapping for techniques to present varying vulnerabilities across host types. 
+            # if no mapping for this host type, use os matched candidates
+            allowed_techniques = get_allowed_techniques(str(host.host_type.type._name_), self.name)
+            
+            if allowed_techniques:
+                # only use techniques mapped to this host type + phase
+                filtered_candidates = [
+                    (mid, at, t) for mid, at, t in candidates
+                    if mid in allowed_techniques
+                ]
+                if filtered_candidates:
+                    candidates = filtered_candidates
+                else:
+                    print(f"No techniques allowed for {host.host_type} in phase {self.name} on host {host.name}")
+
             if len(candidates) == 0:
+                print(f"No valid techniques found for host {host.name} of type {host.host_type} and action {self.name}, failing action")
                 self.action_results.attack_success = False
                 return self.action_results
             

@@ -20,6 +20,7 @@ from cyberwheel.red_actions.red_base import RedActionResults
 from cyberwheel.red_agents import ARTAgent
 from cyberwheel.red_agents.red_agent_base import RedAgentResult
 from cyberwheel.reward.reward_base import RewardMap
+from cyberwheel.utils.technique_config import get_allowed_techniques
 
 
 class RLARTAgent(ARTAgent):
@@ -90,8 +91,10 @@ class RLARTAgent(ARTAgent):
                 result = art_action(
                     self.current_host,
                     target_host,
-                    self.service_mapping[target_host_name][art_action],
+                    # self.service_mapping[target_host_name][art_action],
+                    get_allowed_techniques(target_host.host_type.type._name_, art_action.name)
                 ).sim_execute()  # Executes the ART Action, returns results
+
             success = result.attack_success
             # print(f"Success: {success}\n\n")
             self.handle_action(result)

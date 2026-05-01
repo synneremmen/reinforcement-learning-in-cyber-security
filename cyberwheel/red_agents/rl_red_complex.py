@@ -117,7 +117,6 @@ class RLComplexAgent(ARTAgent):
                 result = Nothing(self.current_host, self.current_host).sim_execute()
             else:
                 # For specific techniques
-                # print("Executing technique ", art_action.mitre_id)
                 phase = self.phase_map[art_action.__name__]
                 phase_class = self.phase_classes.get(phase)
                 if phase_class:
