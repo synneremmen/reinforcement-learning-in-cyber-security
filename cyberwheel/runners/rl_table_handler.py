@@ -1,5 +1,4 @@
 from collections import defaultdict
-from torch import nn, optim
 
 from cyberwheel.utils import RLPolicyTableBased
 from gymnasium.vector import VectorEnv, AsyncVectorEnv
@@ -28,7 +27,7 @@ class RLTableHandler:
         for agent in agents:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
-            self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], self.initial_epsilon, device=self.device)
+            self.agents[agent]["policy"] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], self.args)
 
         if self.load:
             self.load_models()
@@ -141,7 +140,6 @@ class RLTableHandler:
                     if not self.reached_valid_target and successful_impact:
                         # reached first valid target
                         self.reached_valid_target = True
-                        print(f"Reached first valid target on step {self.steps_before_first_valid_target}")
 
                     if successful_impact:
                         # log number of valid impacted targets
@@ -168,18 +166,7 @@ class RLTableHandler:
             mean_rew = self.agents[agent]["rewards"].sum(axis=0).mean()
             output_str += f", {agent}_episodic_return={mean_rew}"
             writer.add_scalar(f"charts/{agent}_episodic_return", mean_rew, self.global_step)
-                
-            q_table = self.agents[agent]["policy"].q_table
-            num_states = len(q_table)
-            if num_states > 0:
-                all_q_values = torch.stack([v for v in q_table.values()])
-                # mean_q = all_q_values.mean().item()
-                # max_q = all_q_values.max().item()
-                # writer.add_scalar(f"charts/{agent}_mean_q_value", mean_q, self.global_step)
-                # writer.add_scalar(f"charts/{agent}_max_q_value", max_q, self.global_step)
-                writer.add_scalar(f"charts/{agent}_num_states_visited", num_states, self.global_step)
-                
-                
+
         # print(output_str)
         writer.add_scalar("charts/episodic_runtime", episodic_runtime, self.global_step)
         writer.add_scalar("charts/episodic_process_time", episodic_processing_time, self.global_step)
@@ -330,7 +317,7 @@ class RLTableHandler:
                 writer.add_scalar(f"charts/{agent}_mean_q_value", mean_q, self.global_step)
                 writer.add_scalar(f"charts/{agent}_max_q_value", max_q, self.global_step)
                 writer.add_scalar(f"charts/{agent}_num_states_visited", num_states, self.global_step)
-            writer.add_scalar(f"charts/{agent}_epsilon", self.agents[agent]["policy"].epsilon, self.global_step)
+            # writer.add_scalar(f"charts/{agent}_epsilon", self.agents[agent]["policy"].epsilon, self.global_step)
             writer.add_scalar(f"charts/{agent}_td_update_mean", self.agents[agent].get("td_update_mean", 0.0), self.global_step)
             writer.add_scalar(f"charts/{agent}_td_update_abs_mean", self.agents[agent].get("td_update_abs_mean", 0.0), self.global_step)
             writer.add_scalar(f"charts/{agent}_td_update_max_abs", self.agents[agent].get("td_update_max_abs", 0.0), self.global_step)
@@ -360,7 +347,7 @@ class RLTableHandler:
                 epsilon = initial_epsilon - (initial_epsilon - final_epsilon) * min(episode / decay_episodes, 1.0)
                 self.agents[agent]["policy"].epsilon = epsilon
 
-    def expand_model(self, old_policy, expansion_type="q_values"):
+    def expand_model(self, old_policy, args, writer=None):
         old_action_shape = old_policy.action_space_shape
         old_q_table = old_policy.q_table
         new_action_shape = self.agents["red"]["policy"].action_space_shape
@@ -373,9 +360,9 @@ class RLTableHandler:
         pi(aij) = pi(bi)pi(aij|bi)
         """
         for state, action_values in old_q_table.items():
-            new_q_table[state] = self.get_new_action_values(action_values, expansion_type)
+            new_q_table[state] = self.get_new_action_values(action_values, args.method)
 
-        print("New Q-table initialized with", len(new_q_table), "states and", new_q_table[next(iter(new_q_table))].shape, "actions per state.")
+        print("New Q-table initialized with", len(new_q_table), "states and", new_q_table[list(new_q_table.keys())[0]].shape, "actions per state.")
         self.agents["red"]["policy"].q_table = new_q_table
 
     def get_action_mapping(self, path="/cyberwheel/data/configs/red_agent/rl_red_complex.yaml"):
@@ -389,7 +376,7 @@ class RLTableHandler:
             phases[phase] += 1
         self.mapping = phases
 
-    def get_new_action_values(self, action_values, expansion_type):
+    def get_new_action_values(self, action_values, method):
         """
         Get new action values for expanded action space while keeping probabilities of old actions the same.
         Args:
@@ -403,7 +390,8 @@ class RLTableHandler:
             raise ValueError("Action mapping is empty. Run get_action_mapping() before expanding the model.")
         repeats = list(self.mapping.values())
 
-        if expansion_type == "probabilities":
+        if method == "softmax":
+            # convert action values to probabilities
             probabilities = torch.softmax(action_values, dim=0)    
             new_values = torch.tensor([], dtype=probabilities.dtype, device=probabilities.device)
             nothing_val = probabilities[-1].unsqueeze(0)
@@ -412,22 +400,22 @@ class RLTableHandler:
             target_min = torch.min(action_values)
             target_max = torch.max(action_values)
             values = probabilities[:-1]
-        elif expansion_type == "q_values":
+        elif method == "copy_values":
+            # retrieve old action values, nothing (last action) kept separate
             new_values = torch.tensor([], dtype=action_values.dtype, device=action_values.device)
             nothing_val = action_values[-1].unsqueeze(0)
             values = action_values[:-1]
         else:
-            raise ValueError(f"Invalid expansion_type '{expansion_type}'. Must be 'probabilities' or 'q_values'.")
+            raise ValueError(f"Invalid method '{method}' for table based expansion. Must be 'softmax' or 'copy_values'.")
 
         for i, val in enumerate(values):
+            # repeat according to mapping, divide value by number of repeats to keep total probability mass the same
             num_repeat = repeats[i % len(repeats)]
-            if expansion_type == "probabilities":
-                new_val = val / num_repeat
-            else:
-                new_val = val
+            new_val = val / num_repeat
             repeated_vals = new_val.repeat(num_repeat)
             new_values = torch.cat([new_values, repeated_vals])
 
+        # append last action "nothing" value at the end
         new_values = torch.cat([new_values, nothing_val]) # nothing (last action)
 
         if new_values.numel() != self.agents["red"]["policy"].action_space_shape:
@@ -436,7 +424,7 @@ class RLTableHandler:
                 "Check phase-to-repeat mapping and inclusion of the 'nothing' action."
             )
 
-        if expansion_type == "probabilities":
+        if method == "softmax":
             new_action_values = self.invert_softmax(new_values, mean, std, target_min, target_max)
             # print(
             #     f"[expand] old_range=({target_min.item():.4f}, {target_max.item():.4f}) -> "

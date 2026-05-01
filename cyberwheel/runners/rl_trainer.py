@@ -1,5 +1,4 @@
 import torch
-import math
 import random
 import gymnasium as gym
 from gymnasium import spaces
@@ -13,9 +12,7 @@ import yaml
 from copy import deepcopy
 from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
-from torch import optim, nn
 from importlib.resources import files
-from statistics import mean, median
 
 from cyberwheel.runners.rl_q_handler import RLQHandler
 from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTableBased, RLPolicyQLearning
@@ -150,11 +147,28 @@ class RLTrainer:
                 # Load the agent
 
                 if isinstance(self.handler, RLTableHandler):
-                    eval_agent = RLPolicyTableBased(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"], device=eval_device)
+                    eval_agent = RLPolicyTableBased(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"], args=self.args)
                     eval_agent.q_table = loaded_models[agent]
                 elif isinstance(self.handler, RLQHandler):
-                    eval_agent = RLPolicyQLearning(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"]).to(eval_device)
-                    eval_agent.load_state_dict(loaded_models[agent])
+                    checkpoint = loaded_models[agent]
+                    state_dict = checkpoint["state_dict"] if isinstance(checkpoint, dict) and "state_dict" in checkpoint else checkpoint
+                    hidden_layers = RLPolicyQLearning.hidden_layers_from_state_dict(state_dict)
+                    if isinstance(checkpoint, dict):
+                        checkpoint_hidden_layers = checkpoint.get("architecture", {}).get("hidden_layers")
+                        if checkpoint_hidden_layers is not None and list(checkpoint_hidden_layers) != list(hidden_layers):
+                            print(
+                                f"Warning: checkpoint architecture metadata {checkpoint_hidden_layers} does not match "
+                                f"state_dict architecture {hidden_layers}. Using the inferred architecture."
+                            )
+
+                    eval_agent = RLPolicyQLearning(
+                        action_space_shape=self.handler.agents[agent]["max_action_space_size"],
+                        obs_space_shape=self.handler.agents[agent]["shape"],
+                        use_target=False, # evaluating, no target model required
+                        hidden_layers=hidden_layers,
+                    ).to(eval_device)
+
+                    eval_agent.load_state_dict(state_dict)
                     eval_agent.eval()
                 else:
                     eval_agent = RLPolicyActorCritic(action_space_shape=self.handler.agents[agent]["max_action_space_size"], obs_space_shape=self.handler.agents[agent]["shape"]).to(eval_device)
@@ -233,7 +247,7 @@ class RLTrainer:
             else:
                 self.static_agents.append(agent_type)
         
-        print("Defining environment(s) and beginning training:", end="\n\n")
+        # print("Defining environment(s) and beginning training:", end="\n\n")
 
         self.envs = self.get_envs()
         # Create agent and optimizer
@@ -393,10 +407,6 @@ class RLTrainer:
             for network_name in eval_return:
                 self.writer.add_scalar("charts/eval_time", int(time.time() - start_eval), self.handler.global_step)
                 self.writer.add_scalar("charts/eval_process_time", int(time.process_time() - start_process_eval), self.handler.global_step)
-                mean_decoys_attacked = mean(self.episode_decoy_attacks)
-                median_decoys_attacked = median(self.episode_decoy_attacks)
-                mean_decoys_deployed = mean(self.episode_decoys_deployed)
-                median_decoys_deployed = median(self.episode_decoys_deployed)
                 for agent in self.agents:
                     self.writer.add_scalar(
                         f"evaluation/{network_name}_episodic_return",

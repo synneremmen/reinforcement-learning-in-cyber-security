@@ -2,6 +2,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from torch import optim
+from torch.optim.lr_scheduler import PolynomialLR
 
 from cyberwheel.utils import RLPolicyQLearning
 from gymnasium.vector import VectorEnv
@@ -32,10 +33,11 @@ class RLQHandler:
         for agent in agents:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
-            self.agents[agent]["policy"] = RLPolicyQLearning(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"]).to(self.device)
+            self.agents[agent]["policy"] = RLPolicyQLearning(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], use_target=self.args.use_target).to(self.device)
             self.agents[agent]["optimizer"] = optim.Adam([
                 { 'params': list(self.agents[agent]["policy"].model.parameters()),  'lr': float(self.args.learning_rate),  'eps': 1e-3 },
             ])
+            self.agents[agent]["scheduler"] = PolynomialLR(self.agents[agent]["optimizer"], total_iters=self.args.total_timesteps, power=0.8)
             self.agents[agent]["lossfn"] = torch.nn.MSELoss()
 
         if self.load:
@@ -152,15 +154,15 @@ class RLQHandler:
                 kill_chain_phases = info.get("red_kill_chain_phases", [])
                 phase = self._phase_bucket(action_name, kill_chain_phases)
                 success = bool(info["red_action_success"])
-                if phase in ["discovery", "privilege-escalation", "lateral-movement", "impact"] and success:
-                    print(f"Phase: {phase} - Received reward {reward_val}")
+                # if phase in ["discovery", "privilege-escalation", "lateral-movement", "impact"] and success:
+                    # print(f"Phase: {phase} - Received reward {reward_val}")
                 valid_target = bool(info["red_target_valid"])
                 successful_impact = success and valid_target and phase == "impact"
 
                 if not self.reached_valid_target and successful_impact:
                     # reached first valid target
                     self.reached_valid_target = True
-                    print(f"Reached first valid target on step {self.steps_before_first_valid_target}")
+                    # print(f"Reached first valid target on step {self.steps_before_first_valid_target}")
 
                 if successful_impact:
                     # log number of valid impacted targets
@@ -195,8 +197,12 @@ class RLQHandler:
         writer.add_scalar("charts/red_valid_target_attempt_ratio", valid_ratio, self.global_step)
         writer.add_scalar("charts/red_reward_valid_targets", self.red_reward_valid_targets, self.global_step)
         writer.add_scalar("charts/red_reward_invalid_targets", self.red_reward_invalid_targets, self.global_step)
-        writer.add_scalar("charts/red_num_states_visited", len(self.visited_states), self.global_step)
-        writer.add_scalar("charts/red_learning_rate", self.agents[agent]["optimizer"].param_groups[0]['lr'], self.global_step)
+        writer.add_scalar("charts/red_steps_before_first_valid_target", self.steps_before_first_valid_target, self.global_step)
+        writer.add_scalar("charts/red_number_of_impacted_valid_targets", self.number_of_impacted_valid_targets, self.global_step)
+        writer.add_scalar("charts/number_valid_targets", self.num_valid_targets, self.global_step)
+        impact_ratio = self.number_of_impacted_valid_targets / self.num_valid_targets
+        writer.add_scalar("charts/red_impacted_valid_targets_ratio", impact_ratio, self.global_step)
+        writer.add_scalar("charts/red_learning_rate", self.agents[agent]["optimizer"].param_groups[0]["lr"], self.global_step)
 
         for phase in ["discovery", "impact"]:
             attempts = self.red_action_attempts[phase]
@@ -253,9 +259,6 @@ class RLQHandler:
             target = rewards + (1 - dones) * self.args.gamma * next_q_values
             # moving target... instable learning
             self.agents[agent]["loss"] = self.agents[agent]["lossfn"](q_values, target)
-            self.agents[agent]["policy"].update += 1
-            self.agents[agent]["policy"].decay_lr()
-            self.agents[agent]["optimizer"].param_groups[0]['lr'] = self.agents[agent]["policy"].learning_rate
 
     def backpropagate(self, update):
         for agent in self.agents:
@@ -263,6 +266,7 @@ class RLQHandler:
             self.agents[agent]["optimizer"].zero_grad()
             self.agents[agent]["loss"].backward()
             self.agents[agent]["optimizer"].step()
+            # self.agents[agent]["scheduler"].step()
             if self.agents[agent]["policy"].use_target:
                 self.agents[agent]["policy"].soft_update()
 
@@ -280,8 +284,15 @@ class RLQHandler:
             agent_path = run_path.joinpath(f"{agent}_agent.pt")
             globalstep_path = run_path.joinpath(f"{agent}_{self.global_step}.pt")
 
-            torch.save(self.agents[agent]["policy"].state_dict(), agent_path)
-            torch.save(self.agents[agent]["policy"].state_dict(), globalstep_path)
+            # no need to save target model
+            policy_state = {k: v for k, v in self.agents[agent]["policy"].state_dict().items() if not k.startswith("target_model.")}
+
+            checkpoint = {
+                "state_dict": policy_state,
+                "architecture": self.agents[agent]["policy"].architecture_metadata(),
+            }
+            torch.save(checkpoint, agent_path)
+            torch.save(checkpoint, globalstep_path)
             print(f"Saved {agent} to {agent_path}")
 
             if self.args.track:
@@ -305,7 +316,42 @@ class RLQHandler:
             agent_path = load_path.joinpath(f"{name}.pt")
             print(f"Loading {agent} agent from: {agent_path}")
             if os.path.exists(agent_path):
-                self.agents[agent]["policy"].load_state_dict(torch.load(agent_path, map_location=torch.device(self.device)))                
+                checkpoint = torch.load(agent_path, map_location=torch.device(self.device))
+                state_dict = checkpoint["state_dict"] if isinstance(checkpoint, dict) and "state_dict" in checkpoint else checkpoint
+                inferred_hidden_layers = RLPolicyQLearning.hidden_layers_from_state_dict(state_dict)
+                print(f"Inferred hidden layers from state_dict: {inferred_hidden_layers}")
+                hidden_layers = None
+                if isinstance(checkpoint, dict):
+                    hidden_layers = checkpoint.get("architecture", {}).get("hidden_layers")
+                if not hidden_layers or list(hidden_layers) != list(inferred_hidden_layers):
+                    if hidden_layers not in (None, []):
+                        print(f"Checkpoint architecture metadata {hidden_layers} does not match state_dict layers {inferred_hidden_layers}; using state_dict layers.")
+                    hidden_layers = inferred_hidden_layers
+                print(f"Loaded hidden layers: {hidden_layers}")
+
+                policy = self.agents[agent]["policy"]
+                if list(policy.hidden_layers) != list(hidden_layers):
+                    self.agents[agent]["policy"] = RLPolicyQLearning(
+                        action_space_shape=policy.action_space_shape,
+                        obs_space_shape=policy.obs_space_shape,
+                        epsilon=policy.epsilon,
+                        use_target=policy.use_target,
+                        hidden_layers=hidden_layers,
+                    ).to(self.device)
+                    policy = self.agents[agent]["policy"]
+                    self.agents[agent]["optimizer"] = optim.Adam([
+                        {"params": list(policy.model.parameters()), "lr": float(self.args.learning_rate), "eps": 1e-3},
+                    ])
+                    self.agents[agent]["scheduler"] = PolynomialLR(self.agents[agent]["optimizer"], total_iters=self.args.total_timesteps, power=0.8)
+
+                model_state_dict = {
+                    key[6:] if key.startswith("model.") else key: value
+                    for key, value in state_dict.items()
+                    if not key.startswith("target_model.")
+                }
+                policy.model.load_state_dict(model_state_dict)
+                if policy.use_target:
+                    policy.set_target_model()
                 self.global_step = 0
                 self.episode = 1
                 self._reset_red_diagnostics()
@@ -316,6 +362,7 @@ class RLQHandler:
     def log_training_metrics(self, writer):
         for agent in self.agents:
             writer.add_scalar(f"losses/{agent}_q_loss", self.agents[agent]["loss"].item(), self.global_step)
+            writer.add_scalar(f"charts/{agent}_num_states_visited", len(self.visited_states), self.global_step)
 
     def reset(self):
         for agent in self.agents:
@@ -343,5 +390,77 @@ class RLQHandler:
             phases[phase] += 1
         self.mapping = phases
 
-    def expand_model(self, abstract_policy, method=None):
-        self.agents["red"]["policy"].expand_model(old_policy=abstract_policy, method=method, mapping=self.mapping)
+    def expand_model(self, abstract_policy, args, writer=None):
+        print(f"Expanding model from action space {abstract_policy.action_space_shape} to {self.agents['red']['policy'].action_space_shape} using method '{args.method}'")
+        # print("-- Hidden layers before expansion: ", self.agents["red"]["policy"].hidden_layers)
+        if args.method == "copy_params":
+            new_model = self.agents["red"]["policy"].copy_params(old_policy=abstract_policy, mapping=self.mapping)
+        elif args.method == "increase_depth":
+            new_model = self.agents["red"]["policy"].increase_depth(old_policy=abstract_policy, reuse_model=args.reuse_model)
+        elif args.method == "kl_divergence":
+            new_model = self.policy_distallation(abstract_policy, args, writer=writer)
+        else:
+            raise ValueError("Invalid expansion method specified. Use 'copy_params', 'increase_depth' or 'kl_divergence'.")
+        
+        # print("-- Hidden layers after expansion: ", self.agents["red"]["policy"].hidden_layers)
+        self.agents["red"]["policy"].model = new_model
+        if self.agents["red"]["policy"].use_target:
+            self.agents["red"]["policy"].set_target_model()
+
+
+    def policy_distallation(self, abstract_policy, args, writer=None):
+        if args.reuse_model:
+            print("Reusing old model weights for layers with matching shapes.")
+            new_model = self.agents["red"]["policy"].increase_depth(old_policy=abstract_policy)
+        else:
+            new_model = self.agents["red"]["policy"]._build_model(self.agents["red"]["policy"].hidden_layers)
+        optimizer = optim.Adam(new_model.parameters())
+        global_step = 0
+        args.kl_divergence_steps
+        num_updates = args.kl_divergence_steps // self.args.num_steps
+        abstract_policy.model.eval()
+        new_model.model.train()
+        print(f"Running for {args.kl_divergence_steps} steps with {num_updates} updates of KL divergence loss.")
+        for _ in range(num_updates):
+            self.reset()
+            obs = self.agents["red"]["next_obs"]
+            for step in range(self.args.num_steps):
+                self.update_action_masks(step)
+                if args.expand_teacher_probs:
+                    with torch.no_grad():
+                        action = new_model.select_action(obs, action_mask=self.agents["red"]["action_masks"][step][0])
+                        probs_teacher = abstract_policy.get_probabilities(obs, mode="teacher")
+                        # teacher is smaller than student, so we must expand the teacher probabilities to match the student's action space before calculating KL divergence
+                        expanded_probs_teacher = torch.zeros((1, new_model.action_space_shape), device=self.device)
+                        idx = 0
+                        teacher_idx = 0
+                        for host in range(self.args.num_hosts):
+                            for count in self.mapping.values():
+                                teacher_value = probs_teacher[:, teacher_idx] / count # need to sum to 1, so divide teacher probability by number of new actions corresponding to old action
+                                expanded_probs_teacher[:, idx:idx+count] = teacher_value.repeat(1, count)
+                                idx += count
+                                teacher_idx += 1
+                        expanded_probs_teacher[:,-1] = probs_teacher[:,-1]
+                    log_probs_student = new_model.get_probabilities(obs, mode="student", expand_teacher_probs=args.expand_teacher_probs)
+                else:
+                    with torch.no_grad():
+                        action = new_model.select_action(obs, action_mask=self.agents["red"]["action_masks"][step][0])
+                        probs_teacher = abstract_policy.get_probabilities(obs, mode="teacher")
+                        expanded_probs_teacher = probs_teacher
+                    # print("Teacher vs student probabilities:")
+                    # print(f"Teacher: {expanded_probs_teacher}")
+                    log_probs_student = new_model.get_probabilities(obs, mode="student", mapping=self.mapping, num_hosts=self.args.num_hosts, expand_teacher_probs=args.expand_teacher_probs)
+                action = action.cpu().numpy()
+                policy_action = {"red": action}
+                # print(f"Step {step}: Executing action {policy_action} in the environment.")
+
+                obs, reward, done, _, info = self.envs.step(policy_action)
+                obs = torch.tensor(obs["red"], dtype=torch.float32, device=self.device)
+                kl_loss = new_model.kl_divergence(log_probs_student, expanded_probs_teacher)
+                writer.add_scalar("charts/kl_divergence_loss", kl_loss.item(), global_step)
+                # print(f"KL divergence loss: {kl_loss.item():.6f}\n")
+                optimizer.zero_grad()
+                kl_loss.backward()
+                optimizer.step()
+                global_step += 1
+        return new_model

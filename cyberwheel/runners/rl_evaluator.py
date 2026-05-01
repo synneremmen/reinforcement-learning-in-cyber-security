@@ -41,7 +41,7 @@ class RLEvaluator(RLTrainer):
             set_seed(seed)
             torch.backends.cudnn.deterministic = False
 
-        self.device = torch.device("cpu")
+        self.device = torch.device(self.args.device)
         print(f"Using device {self.device}")
 
         # Load networks from yaml here
@@ -110,7 +110,7 @@ class RLEvaluator(RLTrainer):
             else:
                 load_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
             if self.args.policy_type == "table_based":
-                self.policy[agent] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape, device=self.device)
+                self.policy[agent] = RLPolicyTableBased(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape, self.args)
                 save_dict = torch.load(
                                 load_path.joinpath(agent_filename),
                                 map_location=self.device,
