@@ -115,6 +115,7 @@ class RLParamHandler:
             for env_idx in range(self.args.num_envs):
 
                 obs = self.agents[agent]["obs"][step][env_idx]
+                self.visited_states.update(tuple(obs))
                 action_mask = self.agents[agent]["action_masks"][step][env_idx]
                 with torch.no_grad():
                     action = self.agents[agent]["policy"].select_action(obs, action_mask=action_mask)
@@ -128,7 +129,6 @@ class RLParamHandler:
 
         # print(f"Step {step}: Executing actions {policy_action} in the environment.")
         obs, reward, done, _, info = self.envs.step(policy_action)
-        self.visited_states.update(tuple(obs[agent][i].tolist()) for agent in self.agents for i in range(self.args.num_envs))
 
         for agent in self.agents:
             for env_idx in range(self.args.num_envs):
@@ -149,7 +149,7 @@ class RLParamHandler:
                 self.steps_before_first_valid_target += 1
             
             if agent == "red" and "red_action" in info and "red_action_success" in info and "red_target_valid" in info:
-                self.num_valid_targets = len(info["valid_targets"])
+                self.num_valid_targets = len(info["valid_targets"][env_idx])
                 action_name = info["red_action"]
                 kill_chain_phases = info.get("red_kill_chain_phases", [])
                 phase = self._phase_bucket(action_name, kill_chain_phases)
