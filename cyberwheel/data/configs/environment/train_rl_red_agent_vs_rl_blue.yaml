@@ -1,7 +1,7 @@
 # Training Parameters
 experiment_name: #TrainRedAgent_TwoLRs_AnnealonUpdate_BothHigh_ActionMask #EmulatorIntegrationCampaign_FixedTypeObs
 deterministic: true # Whether or not the training is deterministic
-seed: 1002
+seed: 1001
 device: cpu # Which device to train on
 async_env: false # Whether to run the environments in parallel
 total_timesteps: 50000000 # Total number of steps to run throughout training
