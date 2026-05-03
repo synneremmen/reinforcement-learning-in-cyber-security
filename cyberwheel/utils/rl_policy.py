@@ -70,7 +70,7 @@ class RLPolicyParameterized(nn.Module):
         super().__init__()
         obs_space_shape = int(np.array(obs_space_shape).prod())
         print(f"Initializing parameterized policy with obs space shape {obs_space_shape} and action space shape {action_space_shape}")
-        self.device = torch.device("cpu") # "cuda" if torch.cuda.is_available() else
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.obs_space_shape = obs_space_shape
         self.action_space_shape = action_space_shape
         self.epsilon = epsilon
@@ -121,6 +121,8 @@ class RLPolicyParameterized(nn.Module):
         return hidden_layers
 
     def soft_update(self):
+        # slowly move to new model from old model by updating with 1-tau of target, and tau of new model
+        # avoid "moving target"
         for tp, sp in zip(self.target_model.parameters(), self.model.parameters()):
             tp.data.copy_((1 - self.tau) * tp.data + self.tau * sp.data)
 
