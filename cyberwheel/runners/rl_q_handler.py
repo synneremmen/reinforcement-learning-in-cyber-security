@@ -273,7 +273,7 @@ class RLParamHandler:
         if self.args.nrec:
             run_path = Path("/persistent01/cyberwheel/models") / self.args.experiment_name
         elif self.args.drive:
-            run_path = files("content.drive.MyDrive.RLCS.models").joinpath(self.args.experiment_name)
+            run_path = Path("/content/drive/MyDrive/RLCS/models") / self.args.experiment_name
         else:
             run_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
         agent_paths = {}
@@ -308,7 +308,7 @@ class RLParamHandler:
             if self.args.nrec:
                 load_path = Path("/persistent01/cyberwheel/models") / self.args.experiment_name
             elif self.args.drive:
-                load_path = Path(str(files("content.drive.MyDrive.RLCS.models").joinpath(self.args.experiment_name)))
+                load_path = Path("/content/drive/MyDrive/RLCS/models") / self.args.experiment_name
             else:
                 load_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
             
