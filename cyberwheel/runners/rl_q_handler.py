@@ -28,7 +28,7 @@ class RLParamHandler:
         self.static_agents = static_agents
         self.episode = 1
         self.load = getattr(self.args, 'load', False)
-        self.visited_states = set()
+        # self.visited_states = set()
 
         for agent in agents:
             self.agents[agent] = agents[agent]
@@ -115,7 +115,7 @@ class RLParamHandler:
             for env_idx in range(self.args.num_envs):
 
                 obs = self.agents[agent]["obs"][step][env_idx]
-                self.visited_states.update(tuple(obs))
+                # self.visited_states.update(tuple(obs))
                 action_mask = self.agents[agent]["action_masks"][step][env_idx]
                 with torch.no_grad():
                     action = self.agents[agent]["policy"].select_action(obs, action_mask=action_mask)
@@ -233,8 +233,8 @@ class RLParamHandler:
         for agent in self.agents:
             if getattr(self.args, "drive", False):
                 with open(f'/content/drive/MyDrive/RLCS/{self.args.experiment_name}_step.txt', 'w') as f:
-                    f.write("Global step: " + str(self.global_step) + ", Episode: " + str(self.episode))
-                print("Global step: " + str(self.global_step) + ", Episode: " + str(self.episode))
+                    f.write("Global step: " + str(self.global_step))
+                print("Global step: " + str(self.global_step))
 
 
     def calculate_loss(self, mb_inds):
@@ -361,7 +361,7 @@ class RLParamHandler:
     def log_training_metrics(self, writer):
         for agent in self.agents:
             writer.add_scalar(f"losses/{agent}_q_loss", self.agents[agent]["loss"].item(), self.global_step)
-            writer.add_scalar(f"charts/{agent}_num_states_visited", len(self.visited_states), self.global_step)
+            # writer.add_scalar(f"charts/{agent}_num_states_visited", len(self.visited_states), self.global_step)
 
     def reset(self):
         for agent in self.agents:
