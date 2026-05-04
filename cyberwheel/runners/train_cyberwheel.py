@@ -57,7 +57,7 @@ def train_cyberwheel(args: YAMLConfig):
     trainer.configure_training()
 
     for update in range(1, args.num_updates + 1):
-        # print(f"----- Update {update} -----")
+        print(f"----- Update {update} -----")
         # update envs each training step if leader and entry host are random (initial method to test)
         red_agent = trainer.handler.envs.envs[0].red_agent
         if red_agent.leader == "random" and red_agent.entry_host == "random":

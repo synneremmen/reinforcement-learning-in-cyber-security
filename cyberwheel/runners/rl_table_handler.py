@@ -202,8 +202,7 @@ class RLTableHandler:
         for agent in self.agents:
             if getattr(self.args, "drive", False):
                 with open(f'/content/drive/MyDrive/RLCS/{self.args.experiment_name}_step.txt', 'w') as f:
-                    f.write("Global step: " + str(self.global_step) + ", Episode: " + str(self.episode))
-                print("Global step: " + str(self.global_step) + ", Episode: " + str(self.episode))
+                    f.write("Global step: " + str(self.global_step))
 
             td_updates = []
             for step in range(self.args.num_steps):
