@@ -234,7 +234,6 @@ class RLParamHandler:
             if getattr(self.args, "drive", False):
                 with open(f'/content/drive/MyDrive/RLCS/{self.args.experiment_name}_step.txt', 'w') as f:
                     f.write("Global step: " + str(self.global_step))
-                print("Global step: " + str(self.global_step))
 
 
     def calculate_loss(self, mb_inds):
