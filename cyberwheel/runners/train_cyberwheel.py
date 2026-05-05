@@ -19,7 +19,7 @@ def train_cyberwheel(args: YAMLConfig):
         args.async_env = False
         args.experiment_name = 'DEBUG_' + args.experiment_name
     args.batch_size = int(args.num_envs * args.num_steps)   # Number of environment steps to performa backprop with
-    args.minibatch_size = int(args.batch_size // args.num_minibatches)  # Number of environments steps to perform backprop with in each epoch
+    args.minibatch_size =  args.batch_size # int(args.batch_size // args.num_minibatches)  # Number of environments steps to perform backprop with in each epoch
     args.num_updates = args.total_timesteps // args.batch_size  # Total number of policy update phases
 
     if args.num_saves > 0:
@@ -60,8 +60,9 @@ def train_cyberwheel(args: YAMLConfig):
         # update envs each training step if leader and entry host are random (initial method to test)
         red_agent = trainer.handler.envs.envs[0].red_agent
         if red_agent.leader == "random" and red_agent.entry_host == "random":
-            seed = trainer.args.seed + update  # change seed each update to get different networks
-            trainer.handler.envs = trainer.get_envs(seed=seed)  # reinitialize envs (entry host and leader will be reselected)
+            if update % 100 == 0:
+                seed = trainer.args.seed + update # change seed each update to get different networks
+                trainer.handler.envs = trainer.get_envs(seed=seed)  # reinitialize envs (entry host and leader will be reselected)
         trainer.train(update)
 
     trainer.close()

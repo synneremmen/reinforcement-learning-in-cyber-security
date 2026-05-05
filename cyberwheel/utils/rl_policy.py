@@ -142,7 +142,7 @@ class RLPolicyParameterized(nn.Module):
             if actions.dim() == 1:
                 actions = actions.unsqueeze(1)
 
-            q_vals = model(obs).gather(1, actions)
+            q_vals = q_values.gather(1, actions)
             # values = q_values.gather(1, action.view(-1, 1))
         if float("-inf") in q_vals:
             # i.e. action nothing will always be available so this should never be the case
