@@ -233,8 +233,8 @@ def generate_random_networks(n_networks=10, num_subnets: int = None, num_hosts: 
     for i in range(n_networks):
         
         if t == "table": # not exceed 6 hosts for table-based policy due to combinatorial explosion of state space
-            rng_num_subnets = (2, 2)
-            hosts_per_subnet = 3
+            rng_num_subnets = (2, 2) # num_hosts % 2?
+            hosts_per_subnet = num_hosts // 2 if num_hosts else 3
             min_hosts_per_subnet = 2
             rng_hosts_per_subnet = (min_hosts_per_subnet, hosts_per_subnet)
         else:
