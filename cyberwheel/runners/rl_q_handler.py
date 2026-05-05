@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, namedtuple, deque
 from pathlib import Path
 
 from torch import optim
@@ -12,7 +12,19 @@ from importlib.resources import files
 import numpy as np
 import torch
 import os
+import random
 
+Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
+
+class replay_buffer():
+    def __init__(self, capacity, agents):
+        self.buffer = {agent: deque(maxlen=capacity) for agent in agents}
+
+    def push(self, experience, agent):
+        self.buffer[agent].append(experience)
+
+    def sample(self, batch_size, agent):
+        return random.sample(self.buffer[agent], batch_size)
 class RLParamHandler:
 
     def __init__(self, envs: VectorEnv, args, agents: dict, static_agents=[]):
@@ -28,6 +40,8 @@ class RLParamHandler:
         self.static_agents = static_agents
         self.episode = 1
         self.load = getattr(self.args, 'load', False)
+        memory_size = 100000
+        self.replay_buffer = replay_buffer(memory_size, list(agents.keys()))
         # self.visited_states = set()
 
         for agent in agents:
@@ -64,6 +78,15 @@ class RLParamHandler:
                     return phase
         return action if action in ["discovery", "impact"] else "other"
 
+    def store_memory(self, experience: Experience, agent):
+        state, action, reward, next_state, done = experience
+        state = torch.tensor(state, dtype=torch.float32, device=self.device)
+        next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device)
+        action = torch.tensor([action], dtype=torch.long)
+        reward = torch.tensor([reward], dtype=torch.float32, device=self.device)
+        done = torch.tensor([done], dtype=torch.float32, device=self.device)
+        experience = Experience(state, action, reward, next_state, done)
+        self.replay_buffer.push(experience, agent=agent)
         
     def define_multiagent_variables(self):
         reset = self.envs.reset(seed=[i for i in range(self.args.num_envs)])[0]
@@ -71,9 +94,8 @@ class RLParamHandler:
         for agent in self.agents:
             agent_dict = self.agents[agent]
             self.agents[agent]["obs"] = torch.zeros((self.args.num_steps, self.args.num_envs) + agent_dict["obs"].shape).to(self.device)
-            self.agents[agent]["actions"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
+            self.agents[agent]["actions"] = torch.zeros((self.args.num_steps, self.args.num_envs), dtype=torch.long).to(self.device)
             self.agents[agent]["action_masks"] = torch.zeros((self.args.num_steps, self.args.num_envs, agent_dict["max_action_space_size"]), dtype=torch.bool).to(self.device)
-            self.agents[agent]["next_action_masks"] = torch.zeros((self.args.num_steps, self.args.num_envs, agent_dict["max_action_space_size"]), dtype=torch.bool).to(self.device)
             self.agents[agent]["resets"] = np.array(reset[agent]) # TODO: Need to update with determinism
             self.agents[agent]["next_obs"] = torch.Tensor(self.agents[agent]["resets"]).to(self.device)
             self.agents[agent]["next_obses"] = torch.zeros((self.args.num_steps, self.args.num_envs) + agent_dict["shape"]).to(self.device)
@@ -102,8 +124,6 @@ class RLParamHandler:
             for i in range(self.args.num_envs):
                 action_mask = self.mask_actions(masks[i][agent], self.agents[agent]["action_masks"][step][i])
                 self.agents[agent]["action_masks"][step][i] = action_mask
-                self.agents[agent]["next_action_masks"][step-1][i] = action_mask # set next action mask for previous step
-
 
     def step_multiagent(self, step: int):
         self.global_step += self.args.num_envs
@@ -144,6 +164,9 @@ class RLParamHandler:
                 reward_val = self.agents[agent]["rewards"][step][env_idx].item()
                 self.agents[agent]["episode_rewards"][env_idx] += reward_val
                 self.agents[agent]["episode_lengths"][env_idx] += 1
+
+                experience = Experience(state=self.agents[agent]["obs"][step][env_idx], action=policy_action[agent][env_idx], reward=reward_val, next_state=obs[agent][env_idx], done=done[env_idx])
+                self.store_memory(experience, agent=agent)
 
             if not self.reached_valid_target and agent == "red":
                 self.steps_before_first_valid_target += 1
@@ -222,7 +245,6 @@ class RLParamHandler:
             self.agents[agent]["batched"]["actions"] = self.agents[agent]["actions"]
             self.agents[agent]["batched"]["rewards"] = self.agents[agent]["rewards"]
             self.agents[agent]["batched"]["action_masks"] = self.agents[agent]["action_masks"].reshape(-1, self.agents[agent]["action_masks"].shape[-1])
-            self.agents[agent]["batched"]["next_action_masks"] = self.agents[agent]["next_action_masks"].reshape(-1, self.agents[agent]["next_action_masks"].shape[-1])
             self.agents[agent]["batched"]["dones"] = self.agents[agent]["dones"]
             
             
@@ -240,20 +262,29 @@ class RLParamHandler:
         # Convert mb_inds to CPU tensor for proper indexing
         # mb_inds = torch.from_numpy(mb_inds).long()
         for agent in self.agents:
-            obs = self.agents[agent]["batched"]["obs"][mb_inds]
-            next_obs = self.agents[agent]["batched"]["next_obses"][mb_inds]
-            actions = self.agents[agent]["batched"]["actions"][mb_inds].long()
-            next_action_masks = self.agents[agent]["batched"]["next_action_masks"][mb_inds] 
+            experience = self.replay_buffer.sample(self.args.batch_size, agent)
+            batch: Experience = Experience(*zip(*experience))
+
+            # obs = self.agents[agent]["batched"]["obs"][mb_inds]
+            # next_obs = self.agents[agent]["batched"]["next_obses"][mb_inds]
+            # actions = self.agents[agent]["batched"]["actions"][mb_inds].long()
+
+            obs = torch.stack(batch.state).to(self.device)
+            rewards = torch.stack(batch.reward).to(self.device)
+            actions = torch.stack(batch.action).to(self.device)
+            next_obs = torch.stack(batch.next_state).to(self.device)
+            dones = torch.stack(batch.done).float().to(self.device)
             q_values = self.agents[agent]["policy"].get_value(obs, actions, use_target=False)
             
             with torch.no_grad():
-                next_q_values = self.agents[agent]["policy"].get_value(next_obs, action_mask=next_action_masks, use_target=True)
+                # soft update to avoid moving target
+                next_q_values = self.agents[agent]["policy"].get_value(next_obs, use_target=True)
             
-            rewards = self.agents[agent]["batched"]["rewards"][mb_inds]
-            dones = self.agents[agent]["batched"]["dones"][mb_inds]
+            # rewards = self.agents[agent]["batched"]["rewards"][mb_inds]
+            # dones = self.agents[agent]["batched"]["dones"][mb_inds]
             
-            if not obs.dim == 2 and not actions.dim() == 2 and not rewards.dim() == 2 and not dones.dim() == 2 and not q_values.dim() == 2 and not next_q_values.dim() == 2 and not next_action_masks.dim() == 2:
-                raise ValueError(f"Unexpected dimensions - obs: {obs.shape}, actions: {actions.shape}, rewards: {rewards.shape}, dones: {dones.shape}, q_values: {q_values.shape}, next_q_values: {next_q_values.shape}, next_action_masks: {next_action_masks.shape}")
+            if not obs.dim == 2 and not actions.dim() == 2 and not rewards.dim() == 2 and not dones.dim() == 2 and not q_values.dim() == 2 and not next_q_values.dim() == 2:
+                raise ValueError(f"Unexpected dimensions - obs: {obs.shape}, actions: {actions.shape}, rewards: {rewards.shape}, dones: {dones.shape}, q_values: {q_values.shape}, next_q_values: {next_q_values.shape}")
             
             target = rewards + (1 - dones) * self.args.gamma * next_q_values
             self.agents[agent]["loss"] = self.agents[agent]["lossfn"](q_values, target)
@@ -350,7 +381,7 @@ class RLParamHandler:
                 policy.model.load_state_dict(model_state_dict)
                 if policy.use_target:
                     policy.set_target_model()
-                self.global_step = 0
+
                 self.episode = 1
                 self._reset_red_diagnostics()
             
@@ -374,7 +405,6 @@ class RLParamHandler:
             self.agents[agent]["obs"] = torch.zeros((self.args.num_steps, self.args.num_envs) + self.agents[agent]["next_obs"].shape[1:]).to(self.device)
             self.agents[agent]["rewards"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
             self.agents[agent]["action_masks"] = torch.zeros((self.args.num_steps, self.args.num_envs, self.agents[agent]["max_action_space_size"]), dtype=torch.bool).to(self.device)
-            self.agents[agent]["next_action_masks"] = torch.zeros((self.args.num_steps, self.args.num_envs, self.agents[agent]["max_action_space_size"]), dtype=torch.bool).to(self.device)
         self._reset_red_diagnostics()
 
     def get_action_mapping(self, path="/cyberwheel/data/configs/red_agent/rl_red_complex.yaml"):

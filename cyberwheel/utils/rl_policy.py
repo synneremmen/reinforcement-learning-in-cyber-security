@@ -126,22 +126,29 @@ class RLPolicyParameterized(nn.Module):
         for tp, sp in zip(self.target_model.parameters(), self.model.parameters()):
             tp.data.copy_((1 - self.tau) * tp.data + self.tau * sp.data)
 
-    def get_value(self, obs, action=None, action_mask=None, use_target=False):
+    def get_value(self, obs, actions=None, action_masks=None, use_target=False):
         """Get Q-values using either main or target network. use_target=True for bootstrapping in DQN."""
         model = self.target_model if use_target and self.use_target else self.model
         q_values = model(obs)
-        if action_mask is not None:
+        
+        if action_masks is not None:
             q_values = q_values.clone()
-            q_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)] = float("-inf")
-        if action is None:
-            values = torch.max(q_values, dim=1).values.reshape(-1, 1)
+            q_values[~action_masks] = float("-inf")
+            # q_values[~torch.as_tensor(action_mask, dtype=torch.bool, device=q_values.device)] = float("-inf")
+        if actions is None:
+            q_vals = q_values.max(1)[0].detach().unsqueeze(1)
+            # values = torch.max(q_values, dim=1).values.reshape(-1, 1)
         else:
-            values = q_values.gather(1, action.view(-1, 1))
-        if float("-inf") in values:
+            if actions.dim() == 1:
+                actions = actions.unsqueeze(1)
+
+            q_vals = model(obs).gather(1, actions)
+            # values = q_values.gather(1, action.view(-1, 1))
+        if float("-inf") in q_vals:
             # i.e. action nothing will always be available so this should never be the case
             raise ValueError("All Q-values are -inf for the given action mask.")
 
-        return values
+        return q_vals
     
     def get_probabilities(self, obs, mode="teacher", mapping=None, num_hosts=None, expand_teacher_probs=False):
         q_values = self.model(obs)
