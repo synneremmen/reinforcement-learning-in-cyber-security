@@ -65,23 +65,61 @@ class RLPolicyActorCritic(nn.Module):
         return action, probs.log_prob(action), probs.entropy(), self.critic(obs)
     
 
+class DuelingQNetwork(nn.Module):
+    def __init__(self, layers, feature_size, action_space_shape):
+        super().__init__()
+        self.shared = nn.Sequential(*layers)
+        self.value_head = nn.Sequential(
+            nn.Linear(feature_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
+        )
+        self.advantage_head = nn.Sequential(
+            nn.Linear(feature_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, action_space_shape)
+        )
+    
+    def forward(self, x):
+        shared_features = self.shared(x)
+        value = self.value_head(shared_features)
+        advantages = self.advantage_head(shared_features)
+        # Q(s,a) = V(s) + (A(s,a) - mean(A(s,a)))
+        q_values = value + (advantages - advantages.mean(dim=1, keepdim=True))
+        # max: q_values = value + (advantages - advantages.max(dim=1, keepdim=True))
+        return q_values
+class DeepQNetwork(nn.Module):
+    def __init__(self, layers, feature_size, action_space_shape):
+        super().__init__()
+        layers.append(nn.Linear(feature_size, action_space_shape))
+        self.model = nn.Sequential(*layers)
+    
+    def forward(self, x):
+        return self.model(x)
 class RLPolicyParameterized(nn.Module):
-    def __init__(self, action_space_shape=0, obs_space_shape=0, epsilon=0.2, use_target=True, eval=False, hidden_layers=None):
+    def __init__(self, action_space_shape=0, obs_space_shape=0, args=None, hidden_layers=None):
         super().__init__()
         obs_space_shape = int(np.array(obs_space_shape).prod())
         print(f"Initializing parameterized policy with obs space shape {obs_space_shape} and action space shape {action_space_shape}")
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.obs_space_shape = obs_space_shape
         self.action_space_shape = action_space_shape
-        self.epsilon = epsilon
-        self.use_target = use_target if use_target is not None else False
+        self.args = args
+        self.epsilon = args.epsilon
+        self.final_epsilon=getattr(args, "final_epsilon") or 0.01
+        self.initial_epsilon=getattr(args, "epsilon") or 0.5
+        self.use_target = args.use_target if args.use_target is not None else False
         self.hidden_layers = list(hidden_layers) if hidden_layers is not None else [64, 64]
         self.increased_depth = len(self.hidden_layers) > 2
         self.old_action_space_shape = self.hidden_layers[-1] if self.increased_depth else None
+        self.dueling = True
         self.model = self._build_model(self.hidden_layers)
         if self.use_target:
-            self.tau = 0.005
+            self.tau = 0.01
             self.set_target_model()
+
+    def decay_epsilon(self):
+        self.epsilon = max(self.epsilon - (self.initial_epsilon - self.final_epsilon) / self.args.num_updates, self.final_epsilon)
 
     def _build_model(self, hidden_layers):
         # given hidden_layers, appends layers and returns sequential model
@@ -91,8 +129,10 @@ class RLPolicyParameterized(nn.Module):
             layers.append(nn.Linear(in_features, hidden_size))
             layers.append(nn.ReLU())
             in_features = hidden_size
-        layers.append(nn.Linear(in_features, self.action_space_shape))
-        return nn.Sequential(*layers).to(self.device)
+        if self.dueling:
+            return DuelingQNetwork(layers, in_features, self.action_space_shape).to(self.device)            
+        else:
+            return DeepQNetwork(layers, in_features, self.action_space_shape).to(self.device)
 
     def _set_hidden_layers(self, hidden_layers):
         # set self.hidden_layers to list given, increased depth true if more than two hidden layers
@@ -111,14 +151,25 @@ class RLPolicyParameterized(nn.Module):
 
     @staticmethod
     def hidden_layers_from_state_dict(state_dict):
-        # get hidden layers by extracting shape of weights for each layer in the state dict
-        layer_indices = sorted(
-            int(key.split(".")[1])
-            for key in state_dict.keys()
-            if key.startswith("model.") and key.endswith(".weight")
-        )
-        hidden_layers = [state_dict[f"model.{index}.weight"].shape[0] for index in layer_indices[:-1]]
-        return hidden_layers
+        # Check if this is a dueling network by looking for dueling-specific heads
+        is_dueling = any(k.startswith("model.shared.") for k in state_dict.keys())
+
+        if is_dueling:
+            # For dueling network, extract shared layer sizes
+            layer_sizes = []
+            i = 0
+            while f"model.shared.{i}.weight" in state_dict:
+                layer_sizes.append(state_dict[f"model.shared.{i}.weight"].shape[0])
+                i += 2  # skip ReLU (no weights)
+            return layer_sizes
+        else:
+            # For non-dueling network, extract model layer sizes (excluding output layer)
+            layer_sizes = []
+            i = 0
+            while f"model.model.{i}.weight" in state_dict:
+                layer_sizes.append(state_dict[f"model.model.{i}.weight"].shape[0])
+                i += 2  # skip ReLU (no weights)
+            return layer_sizes[:-1]  # exclude final output layer
 
     def soft_update(self):
         # slowly move to new model from old model by updating with 1-tau of target, and tau of new model
@@ -129,7 +180,7 @@ class RLPolicyParameterized(nn.Module):
     def get_value(self, obs, actions=None, action_masks=None, use_target=False):
         """Get Q-values using either main or target network. use_target=True for bootstrapping in DQN."""
         model = self.target_model if use_target and self.use_target else self.model
-        q_values = model(obs)
+        q_values = model.forward(obs)
         
         if action_masks is not None:
             q_values = q_values.clone()
@@ -141,7 +192,6 @@ class RLPolicyParameterized(nn.Module):
         else:
             if actions.dim() == 1:
                 actions = actions.unsqueeze(1)
-
             q_vals = q_values.gather(1, actions)
             # values = q_values.gather(1, action.view(-1, 1))
         if float("-inf") in q_vals:
@@ -151,8 +201,8 @@ class RLPolicyParameterized(nn.Module):
         return q_vals
     
     def get_probabilities(self, obs, mode="teacher", mapping=None, num_hosts=None, expand_teacher_probs=False):
-        q_values = self.model(obs)
-        temperature = 2.0
+        q_values = self.model.forward(obs)
+        temperature = 1.0
         q_values = q_values / temperature
         if mode == "teacher":
             probs = torch.nn.functional.softmax(q_values, dim=1)
@@ -179,7 +229,7 @@ class RLPolicyParameterized(nn.Module):
         if obs.dim() == 1:
             obs = obs.unsqueeze(0)
 
-        logits = self.model(obs)
+        logits = self.model.forward(obs)
         if action_mask is not None:
             action_mask = torch.as_tensor(action_mask, dtype=torch.bool, device=logits.device)
             if action_mask.dim() == 1:
@@ -212,7 +262,7 @@ class RLPolicyParameterized(nn.Module):
         if obs.dim() == 1:
             obs = obs.unsqueeze(0)
 
-        logits = self.model(obs)
+        logits = self.model.forward(obs)
         if action_mask is not None:
             action_mask = torch.as_tensor(action_mask, dtype=torch.bool, device=logits.device)
             if action_mask.dim() == 1:

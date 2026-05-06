@@ -161,10 +161,11 @@ class RLTrainer:
                                 f"state_dict architecture {hidden_layers}. Using the inferred architecture."
                             )
 
+                    self.args.use_target = False # evaluating, no target model required
                     eval_agent = RLPolicyParameterized(
                         action_space_shape=self.handler.agents[agent]["max_action_space_size"],
                         obs_space_shape=self.handler.agents[agent]["shape"],
-                        use_target=False, # evaluating, no target model required
+                        args=self.args,
                         hidden_layers=hidden_layers,
                     ).to(eval_device)
 

@@ -125,7 +125,7 @@ class RLEvaluator(RLTrainer):
                 self.policy[agent].q_table.update(q_table_dict)
                 
             elif self.args.policy_type == "parameterized":
-                self.policy[agent] = RLPolicyParameterized(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape, eval=True).to(self.device)
+                self.policy[agent] = RLPolicyParameterized(self.agents[agent]["max_action_space_size"], self.agents[agent]["obs"].shape, self.args).to(self.device)
                 state_dict = torch.load(
                     load_path.joinpath(agent_filename),
                     map_location=self.device,

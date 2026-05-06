@@ -30,7 +30,6 @@ class RLParamHandler:
     def __init__(self, envs: VectorEnv, args, agents: dict, static_agents=[]):
         self.envs = envs
         self.args = args
-        # Use a GPU if available. You can choose a specific GPU with CUDA, for example by setting 'device' to "cuda:0"
         self.device = self.args.device
         print(f"Using device '{self.device}'")
 
@@ -47,7 +46,7 @@ class RLParamHandler:
         for agent in agents:
             self.agents[agent] = agents[agent]
             self.agents[agent]["shape"] = self.agents[agent]["obs"].shape
-            self.agents[agent]["policy"] = RLPolicyParameterized(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], use_target=self.args.use_target).to(self.device)
+            self.agents[agent]["policy"] = RLPolicyParameterized(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], args=self.args).to(self.device)
             self.agents[agent]["optimizer"] = optim.Adam([
                 { 'params': list(self.agents[agent]["policy"].model.parameters()),  'lr': float(self.args.learning_rate),  'eps': 1e-3 },
             ])
@@ -216,7 +215,7 @@ class RLParamHandler:
         writer.add_scalar("charts/red_steps_before_first_valid_target", self.steps_before_first_valid_target, self.global_step)
         writer.add_scalar("charts/red_number_of_impacted_valid_targets", self.number_of_impacted_valid_targets, self.global_step)
         writer.add_scalar("charts/number_valid_targets", self.num_valid_targets, self.global_step)
-        impact_ratio = self.number_of_impacted_valid_targets / self.num_valid_targets
+        impact_ratio = (self.number_of_impacted_valid_targets / self.num_valid_targets) if self.num_valid_targets > 0 else 0.0
         writer.add_scalar("charts/red_impacted_valid_targets_ratio", impact_ratio, self.global_step)
         writer.add_scalar("charts/red_learning_rate", self.agents[agent]["optimizer"].param_groups[0]["lr"], self.global_step)
 
@@ -269,12 +268,16 @@ class RLParamHandler:
     
             target = rewards + (1 - dones) * self.args.gamma * next_q_values
             self.agents[agent]["loss"] = self.agents[agent]["lossfn"](q_values, target)
+        self.agents[agent]["policy"].decay_epsilon()
 
     def backpropagate(self, update):
         for agent in self.agents:
             # Backpropagation for Actor-Critic policy
             self.agents[agent]["optimizer"].zero_grad()
             self.agents[agent]["loss"].backward()
+            for param in self.agents[agent]["policy"].parameters():
+                if param.grad is not None:
+                    param.grad.data.clamp_(-1, 1)  # gradient clipping
             self.agents[agent]["optimizer"].step()
             # self.agents[agent]["scheduler"].step()
             if self.agents[agent]["policy"].use_target:
@@ -344,8 +347,7 @@ class RLParamHandler:
                     self.agents[agent]["policy"] = RLPolicyParameterized(
                         action_space_shape=policy.action_space_shape,
                         obs_space_shape=policy.obs_space_shape,
-                        epsilon=policy.epsilon,
-                        use_target=policy.use_target,
+                        args=self.args,
                         hidden_layers=hidden_layers,
                     ).to(self.device)
                     policy = self.agents[agent]["policy"]

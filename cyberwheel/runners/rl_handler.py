@@ -32,7 +32,7 @@ class RLHandler:
             if self.args.policy_type == "tabular":
                 self.agents[agent]["policy"] = RLPolicyTabular(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], device=self.device)
             elif self.args.policy_type == "parameterized":
-                self.agents[agent]["policy"] = RLPolicyParameterized(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], device=self.device)
+                self.agents[agent]["policy"] = RLPolicyParameterized(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], args=self.args).to(self.device)
             else:
                 self.agents[agent]["policy"] = RLPolicyActorCritic(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"]).to(self.device)
                 self.agents[agent]["optimizer"] = optim.Adam([
