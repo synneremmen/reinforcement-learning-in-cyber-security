@@ -106,8 +106,8 @@ class RLPolicyParameterized(nn.Module):
         self.action_space_shape = action_space_shape
         self.args = args
         self.epsilon = args.epsilon
-        self.final_epsilon=getattr(args, "final_epsilon") or 0.01
-        self.initial_epsilon=getattr(args, "epsilon") or 0.5
+        self.final_epsilon=getattr(args, "final_epsilon", 0.01)
+        self.initial_epsilon=getattr(args, "epsilon", 0.5)
         self.use_target = args.use_target if args.use_target is not None else False
         self.hidden_layers = list(hidden_layers) if hidden_layers is not None else [64, 64]
         self.increased_depth = len(self.hidden_layers) > 2
