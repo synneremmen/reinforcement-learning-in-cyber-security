@@ -119,7 +119,7 @@ class RLPolicyParameterized(nn.Module):
             self.set_target_model()
 
     def decay_epsilon(self):
-        self.epsilon = max(self.epsilon - (self.initial_epsilon - self.final_epsilon) / self.args.num_updates, self.final_epsilon)
+        self.epsilon = max(self.epsilon - (self.initial_epsilon - self.final_epsilon) / self.args.total_timesteps, self.final_epsilon)
 
     def _build_model(self, hidden_layers):
         # given hidden_layers, appends layers and returns sequential model

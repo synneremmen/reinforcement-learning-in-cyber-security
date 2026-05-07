@@ -141,6 +141,7 @@ class RLParamHandler:
 
             # Execute the selected action in the environment to collect experience for training.
             policy_action[agent] = self.agents[agent]["actions"][step].cpu().numpy()
+            self.agents[agent]["policy"].decay_epsilon()
         #print(policy_action)
 
         # print(f"Step {step}: Executing actions {policy_action} in the environment.")
@@ -206,6 +207,7 @@ class RLParamHandler:
         # print(output_str)
         writer.add_scalar("charts/episodic_runtime", episodic_runtime, self.global_step)
         writer.add_scalar("charts/episodic_process_time", episodic_processing_time, self.global_step)
+        writer.add_scalar("charts/epsilon", self.agents[agent]["policy"].epsilon, self.global_step)
 
         total_attempts = self.red_valid_target_attempts + self.red_invalid_target_attempts
         valid_ratio = self.red_valid_target_attempts / total_attempts if total_attempts > 0 else 0.0
@@ -268,7 +270,6 @@ class RLParamHandler:
     
             target = rewards + (1 - dones) * self.args.gamma * next_q_values
             self.agents[agent]["loss"] = self.agents[agent]["lossfn"](q_values, target)
-        self.agents[agent]["policy"].decay_epsilon()
 
     def backpropagate(self, update):
         for agent in self.agents:
