@@ -97,13 +97,8 @@ class RLParamHandler:
             self.agents[agent]["action_masks"] = torch.zeros((self.args.num_steps, self.args.num_envs, agent_dict["max_action_space_size"]), dtype=torch.bool).to(self.device)
             self.agents[agent]["resets"] = np.array(reset[agent]) # TODO: Need to update with determinism
             self.agents[agent]["next_obs"] = torch.Tensor(self.agents[agent]["resets"]).to(self.device)
-            # self.agents[agent]["next_obses"] = torch.zeros((self.args.num_steps, self.args.num_envs) + agent_dict["shape"]).to(self.device)
             self.agents[agent]["rewards"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
-            # self.agents[agent]["episode_rewards"] = torch.zeros(self.args.num_envs).to(self.device)
-            # self.agents[agent]["episode_lengths"] = torch.zeros(self.args.num_envs).to(self.device)
             self.agents[agent]["dones"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
-            # self.agents[agent]["q_values"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
-            # self.agents[agent]["next_q_values"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
         self.dones = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
         self.next_done = torch.zeros(self.args.num_envs).to(self.device)
         self.global_step = 0
@@ -278,10 +273,10 @@ class RLParamHandler:
             self.agents[agent]["loss"].backward()
             for param in self.agents[agent]["policy"].parameters():
                 if param.grad is not None:
-                    param.grad.data.clamp_(-1, 1)  # gradient clipping
+                    param.grad.data.clamp_(-5, 5)  # gradient clipping
             self.agents[agent]["optimizer"].step()
             # self.agents[agent]["scheduler"].step()
-            if self.agents[agent]["policy"].use_target:
+            if self.agents[agent]["policy"].use_target and update // 100 == 0:  # soft update every 100 updates
                 self.agents[agent]["policy"].soft_update()
 
     def save_models(self):

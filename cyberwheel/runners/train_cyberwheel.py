@@ -19,7 +19,7 @@ def train_cyberwheel(args: YAMLConfig):
         args.async_env = False
         args.experiment_name = 'DEBUG_' + args.experiment_name
     args.batch_size = int(args.num_envs * args.num_steps)   # Number of environment steps to performa backprop with
-    args.minibatch_size =  args.batch_size # int(args.batch_size // args.num_minibatches)  # Number of environments steps to perform backprop with in each epoch
+    args.minibatch_size = int(args.batch_size // args.num_minibatches)  # Number of environments steps to perform backprop with in each epoch
     args.num_updates = args.total_timesteps // args.batch_size  # Total number of policy update phases
 
     if args.num_saves > 0:

@@ -88,6 +88,7 @@ class DuelingQNetwork(nn.Module):
         q_values = value + (advantages - advantages.mean(dim=1, keepdim=True))
         # max: q_values = value + (advantages - advantages.max(dim=1, keepdim=True))
         return q_values
+    
 class DeepQNetwork(nn.Module):
     def __init__(self, layers, feature_size, action_space_shape):
         super().__init__()
@@ -96,6 +97,7 @@ class DeepQNetwork(nn.Module):
     
     def forward(self, x):
         return self.model(x)
+    
 class RLPolicyParameterized(nn.Module):
     def __init__(self, action_space_shape=0, obs_space_shape=0, args=None, hidden_layers=None):
         super().__init__()
@@ -105,10 +107,10 @@ class RLPolicyParameterized(nn.Module):
         self.obs_space_shape = obs_space_shape
         self.action_space_shape = action_space_shape
         self.args = args
-        self.epsilon = args.epsilon
+        self.epsilon=getattr(args, "epsilon", 0.5)
         self.final_epsilon=getattr(args, "final_epsilon", 0.01)
         self.initial_epsilon=getattr(args, "epsilon", 0.5)
-        self.use_target = args.use_target if args.use_target is not None else False
+        self.use_target =getattr(args, "use_target", False)
         self.hidden_layers = list(hidden_layers) if hidden_layers is not None else [64, 64]
         self.increased_depth = len(self.hidden_layers) > 2
         self.old_action_space_shape = self.hidden_layers[-1] if self.increased_depth else None

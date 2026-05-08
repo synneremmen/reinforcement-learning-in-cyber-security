@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from torch import nn, optim
 
 from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTabular, RLPolicyParameterized
@@ -43,6 +45,28 @@ class RLHandler:
                     self.agents[agent]["scheduler"] = optim.lr_scheduler.CosineAnnealingWarmRestarts(self.agents[agent]["optimizer"], T_0=int(self.args.save_frequency), T_mult=int(self.args.restart_Tmult), eta_min=float(self.args.min_lr), last_epoch=-1) if self.args.anneal_lr == 'cosine_restarts' else None
             # TODO: Reconfigure LR
 
+        if self.args.load:
+            self.load_models(getattr(self.args, 'load_from_experiment', self.args.experiment_name))
+
+    def _reset_red_diagnostics(self):
+        self.red_action_attempts = defaultdict(int)
+        self.red_action_successes = defaultdict(int)
+        self.steps_before_first_valid_target = 0 # how to indicate no flag found?
+        self.reached_valid_target = False
+        self.number_of_impacted_valid_targets = 0
+        self.red_reward_valid_targets = 0.0
+        self.red_reward_invalid_targets = 0.0
+        self.red_valid_target_attempts = 0
+        self.red_invalid_target_attempts = 0
+        self.num_valid_targets = torch.zeros(self.args.num_envs)
+
+    def _phase_bucket(self, action_name, phase_list=None):
+        action = str(action_name).lower().strip("[]'")
+        if phase_list is not None and action not in ["discovery", "impact"]:
+            for phase in phase_list[0]:
+                if phase in ["discovery", "impact"]:
+                    return phase
+        return action if action in ["discovery", "impact"] else "other"
 
     def define_multiagent_variables(self):
         reset = self.envs.reset(seed=[i for i in range(self.args.num_envs)])[0]
@@ -60,6 +84,7 @@ class RLHandler:
         self.dones = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
         self.next_done = torch.zeros(self.args.num_envs).to(self.device)
         self.global_step = 0
+        self._reset_red_diagnostics()
 
     def mask_actions(self, new_action_mask, action_mask):
         new_mask = torch.tensor(
@@ -101,6 +126,41 @@ class RLHandler:
             self.agents[agent]["next_obs"] = torch.Tensor(obs[agent]).to(self.device)
             if f"{agent}_reward" in info:
                 self.agents[agent]["rewards"][step] = torch.tensor(info[f"{agent}_reward"]).to(self.device).view(-1)
+        
+            reward_val = self.agents[agent]["rewards"][step].item()
+            if not self.reached_valid_target and agent == "red":
+                    self.steps_before_first_valid_target += 1
+
+            if agent == "red" and "red_action" in info and "red_action_success" in info and "red_target_valid" in info:
+                self.num_valid_targets = len(info["valid_targets"])
+                action_name = info["red_action"]
+                kill_chain_phases = info.get("red_kill_chain_phases", [])
+                phase = self._phase_bucket(action_name, kill_chain_phases)
+                success = bool(info["red_action_success"])
+                # if phase in ["discovery", "privilege-escalation", "lateral-movement", "impact"] and success:
+                    # print(f"Phase: {phase} - Received reward {reward_val}")
+                valid_target = bool(info["red_target_valid"])
+                successful_impact = success and valid_target and phase == "impact"
+
+                if not self.reached_valid_target and successful_impact:
+                    # reached first valid target
+                    self.reached_valid_target = True
+                    # print(f"Reached first valid target on step {self.steps_before_first_valid_target}")
+
+                if successful_impact:
+                    # log number of valid impacted targets
+                    self.number_of_impacted_valid_targets += 1
+
+                self.red_action_attempts[phase] += 1
+                if success:
+                    self.red_action_successes[phase] += 1
+
+                if valid_target:
+                    self.red_valid_target_attempts += 1
+                    self.red_reward_valid_targets += reward_val
+                else:
+                    self.red_invalid_target_attempts += 1
+                    self.red_reward_invalid_targets += reward_val
 
         self.next_done = torch.Tensor(done).to(self.device)
     
@@ -111,8 +171,30 @@ class RLHandler:
             output_str += f", {agent}_episodic_return={mean_rew}"
             writer.add_scalar(f"charts/{agent}_episodic_return", mean_rew, self.global_step)
         # print(output_str)
-        writer.add_scalar(f"charts/episodic_runtime", episodic_runtime, self.global_step)
-        writer.add_scalar(f"charts/episodic_process_time", episodic_processing_time, self.global_step)
+        writer.add_scalar("charts/episodic_runtime", episodic_runtime, self.global_step)
+        writer.add_scalar("charts/episodic_process_time", episodic_processing_time, self.global_step)
+
+        total_attempts = self.red_valid_target_attempts + self.red_invalid_target_attempts
+        valid_ratio = self.red_valid_target_attempts / total_attempts if total_attempts > 0 else 0.0
+        writer.add_scalar("charts/red_valid_target_attempt_ratio", valid_ratio, self.global_step)
+        writer.add_scalar("charts/red_reward_valid_targets", self.red_reward_valid_targets, self.global_step)
+        writer.add_scalar("charts/red_reward_invalid_targets", self.red_reward_invalid_targets, self.global_step)
+        writer.add_scalar("charts/red_steps_before_first_valid_target", self.steps_before_first_valid_target, self.global_step)
+        writer.add_scalar("charts/red_number_of_impacted_valid_targets", self.number_of_impacted_valid_targets, self.global_step)
+        writer.add_scalar("charts/number_valid_targets", self.num_valid_targets, self.global_step)
+        impact_ratio = (self.number_of_impacted_valid_targets / self.num_valid_targets) if self.num_valid_targets > 0 else 0.0
+        writer.add_scalar("charts/red_impacted_valid_targets_ratio", impact_ratio, self.global_step)
+        writer.add_scalar("charts/red_learning_rate", self.agents[agent]["optimizer"].param_groups[0]["lr"], self.global_step)
+
+        for phase in ["discovery", "impact"]:
+            attempts = self.red_action_attempts[phase]
+            successes = self.red_action_successes[phase]
+            success_rate = successes / attempts if attempts > 0 else 0.0
+            writer.add_scalar(f"charts/red_{phase}_attempts", attempts, self.global_step)
+            writer.add_scalar(f"charts/red_{phase}_successes", successes, self.global_step)
+            writer.add_scalar(f"charts/red_{phase}_success_rate", success_rate, self.global_step)
+
+        self._reset_red_diagnostics()
 
     def compute_gae(self):
         for agent in self.agents:
@@ -174,30 +256,26 @@ class RLHandler:
             newvalue = self.agents[agent]["newvalue"].view(-1)
             # Calculate the MSE loss between the returns and the value predictions of the critic
             # Clipping V loss is often not necessary and arguably worse in practice
-            if self.args.clip_vloss and not isinstance(self.agents[agent]["policy"], RLPolicyTabular):
-                v_loss_unclipped = (newvalue - self.agents[agent]["batched"]["returns"][mb_inds]) ** 2
-                v_clipped = self.agents[agent]["batched"]["values"][mb_inds] + torch.clamp(
-                    newvalue - self.agents[agent]["batched"]["values"][mb_inds],
-                    -self.args.clip_coef,
-                    self.args.clip_coef,
-                )
-                v_loss_clipped = (v_clipped - self.agents[agent]["batched"]["returns"][mb_inds]) ** 2
-                v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
-                self.agents[agent]["value_loss"] = 0.5 * v_loss_max.mean()
-            else:
-                self.agents[agent]["value_loss"] = 0.5 * ((newvalue - self.agents[agent]["batched"]["returns"][mb_inds]) ** 2).mean()
-            
-            if isinstance(self.agents[agent]["policy"], RLPolicyActorCritic):
-                # Policy loss using PPO's ration clipping
-                pg_loss1 = -self.agents[agent]["mb_advantages"] * self.agents[agent]["ratio"]
-                pg_loss2 = -self.agents[agent]["mb_advantages"] * torch.clamp(
-                    self.agents[agent]["ratio"], 1 - self.args.clip_coef, 1 + self.args.clip_coef
-                )
-                # Add an entropy bonus to the loss
-                self.agents[agent]["entropy_loss"] = self.agents[agent]["entropy"].mean()
-                self.agents[agent]["policy_loss"] = torch.max(pg_loss1, pg_loss2).mean()
-                self.agents[agent]["loss"] = self.agents[agent]["policy_loss"] - self.args.ent_coef * self.agents[agent]["entropy_loss"] + self.agents[agent]["value_loss"] * self.args.vf_coef
-    
+            v_loss_unclipped = (newvalue - self.agents[agent]["batched"]["returns"][mb_inds]) ** 2
+            v_clipped = self.agents[agent]["batched"]["values"][mb_inds] + torch.clamp(
+                newvalue - self.agents[agent]["batched"]["values"][mb_inds],
+                -self.args.clip_coef,
+                self.args.clip_coef,
+            )
+            v_loss_clipped = (v_clipped - self.agents[agent]["batched"]["returns"][mb_inds]) ** 2
+            v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
+            self.agents[agent]["value_loss"] = 0.5 * v_loss_max.mean()
+
+            # Policy loss using PPO's ration clipping
+            pg_loss1 = -self.agents[agent]["mb_advantages"] * self.agents[agent]["ratio"]
+            pg_loss2 = -self.agents[agent]["mb_advantages"] * torch.clamp(
+                self.agents[agent]["ratio"], 1 - self.args.clip_coef, 1 + self.args.clip_coef
+            )
+            # Add an entropy bonus to the loss
+            self.agents[agent]["entropy_loss"] = self.agents[agent]["entropy"].mean()
+            self.agents[agent]["policy_loss"] = torch.max(pg_loss1, pg_loss2).mean()
+            self.agents[agent]["loss"] = self.agents[agent]["policy_loss"] - self.args.ent_coef * self.agents[agent]["entropy_loss"] + self.agents[agent]["value_loss"] * self.args.vf_coef
+
     def backpropagate(self, update):
         for agent in self.agents:
             # Backpropagation for Actor-Critic policy
@@ -243,6 +321,22 @@ class RLHandler:
             agent_paths[agent] = agent_path
         return agent_paths
     
+    def load_models(self, experiment_name):
+        for agent in self.agents:
+            if self.args.nrec:
+                load_path = Path("/persistent01/cyberwheel/models") / experiment_name
+            elif self.args.drive:
+                load_path = Path("/content/drive/MyDrive/RLCS/models") / experiment_name
+            else:
+                load_path = files("cyberwheel.data.models").joinpath(experiment_name)
+            agent_path = load_path.joinpath(f"{agent}_agent.pt")
+            if os.path.exists(agent_path):
+                self.agents[agent]["policy"].load_state_dict(torch.load(agent_path, map_location=self.device))
+                print(f"Loaded model for agent '{agent}' from '{agent_path}'")
+            else:
+                print(f"No model path provided for agent '{agent}', skipping load.")
+        self._reset_red_diagnostics()
+    
     def log_training_metrics(self, writer):
         for agent in self.agents:
             writer.add_scalar(f"charts/{agent}_actor_lr", self.agents[agent]["optimizer"].param_groups[0]["lr"], self.global_step)
@@ -260,3 +354,19 @@ class RLHandler:
             reset = self.envs.reset()[0]
             self.agents[agent]["resets"] = np.array(reset[agent])
             self.agents[agent]["next_obs"] = torch.Tensor(self.agents[agent]["resets"]).to(self.device)
+
+
+    def expand_model(self, abstract_policy, args, writer=None):
+        print(f"Expanding model from action space {abstract_policy.action_space_shape} to {self.agents['red']['policy'].action_space_shape} using method '{args.method}'")
+        # print("-- Hidden layers before expansion: ", self.agents["red"]["policy"].hidden_layers)
+        if args.method == "copy_params":
+            new_model = self.agents["red"]["policy"].copy_params(old_policy=abstract_policy, mapping=self.mapping)
+        elif args.method == "increase_depth":
+            new_model = self.agents["red"]["policy"].increase_depth(old_policy=abstract_policy, reuse_model=args.reuse_model)
+        elif args.method == "kl_divergence":
+            new_model = self.policy_distallation(abstract_policy, args, writer=writer)
+        else:
+            raise ValueError("Invalid expansion method specified. Use 'copy_params', 'increase_depth' or 'kl_divergence'.")
+        
+        # print("-- Hidden layers after expansion: ", self.agents["red"]["policy"].hidden_layers)
+        self.agents["red"]["policy"].model = new_model
