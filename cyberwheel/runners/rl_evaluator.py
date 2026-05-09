@@ -226,7 +226,7 @@ class RLEvaluator(RLTrainer):
                 for agent in self.agents:
                     agent_obs = torch.Tensor(obs[agent]).to(self.device)
                     tmp_mask = action_masks[agent]
-                    self.action_mask[agent] = self.mask_actions(tmp_mask, self.action_mask[agent])
+                    self.action_mask[agent] = self.mask_actions(tmp_mask, self.action_mask[agent]).to(self.device)
                     action, _, _, _ = self.policy[agent].get_action_and_value(agent_obs, action_mask=self.action_mask[agent])
                     actions[agent] = action
 
