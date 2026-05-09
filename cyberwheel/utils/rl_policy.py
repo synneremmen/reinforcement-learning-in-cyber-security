@@ -31,7 +31,7 @@ class RLPolicyActorCritic(nn.Module):
             layer_init(nn.Linear(64, 64)),
             nn.ReLU(),
             layer_init(nn.Linear(64, action_space_shape), std=0.01),
-        )
+        ).to("cuda" if torch.cuda.is_available() else "cpu")
 
         # Critic network has an input layer, 2 hidden layers with 64 nodes, and an output layer.
         # Input layer is the size of the observation space and output layer has 1 node for the predicted value.
@@ -44,7 +44,7 @@ class RLPolicyActorCritic(nn.Module):
             layer_init(nn.Linear(64, 64)),
             nn.ReLU(),
             layer_init(nn.Linear(64, 1), std=1.0),
-        )
+        ).to("cuda" if torch.cuda.is_available() else "cpu")
 
     def get_value(self, obs):
         """Gets the value for a given state x by running x through the critic network"""
@@ -55,12 +55,15 @@ class RLPolicyActorCritic(nn.Module):
         Gets the action and value for the current state by running x through the actor and critic respectively.
         Also calculates the log probabilities of the action and the policy's entropy which are used to calculate PPO's training loss.
         """
+        obs = obs.to("cuda" if torch.cuda.is_available() else "cpu")
         logits = self.actor(obs)
         if action_mask is not None:
+            action_mask = action_mask.to("cuda" if torch.cuda.is_available() else "cpu")
             logits = logits.masked_fill(~action_mask, float("-inf"))
 
         probs = Categorical(logits=logits)
         if action is None:
+            action = action.to("cuda" if torch.cuda.is_available() else "cpu")
             action = probs.sample()
         return action, probs.log_prob(action), probs.entropy(), self.critic(obs)
     
