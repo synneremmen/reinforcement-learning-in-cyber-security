@@ -250,8 +250,7 @@ class RLTrainer:
         
         # print("Defining environment(s) and beginning training:", end="\n\n")
 
-        self.envs = self.get_envs()
-        # Create agent and optimizer
+        self.envs = self.get_envs(seed=self.seed)
 
         if self.args.policy_type == "tabular":
             self.handler = RLTableHandler(self.envs, self.args, self.agents, static_agents=self.static_agents)

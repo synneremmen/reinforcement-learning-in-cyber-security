@@ -132,7 +132,7 @@ class RLHandler:
                     self.steps_before_first_valid_target += 1
 
             if agent == "red" and "red_action" in info and "red_action_success" in info and "red_target_valid" in info:
-                self.num_valid_targets = len(info["valid_targets"])
+                self.num_valid_targets = len(info["valid_targets"][0])
                 action_name = info["red_action"]
                 kill_chain_phases = info.get("red_kill_chain_phases", [])
                 phase = self._phase_bucket(action_name, kill_chain_phases)
