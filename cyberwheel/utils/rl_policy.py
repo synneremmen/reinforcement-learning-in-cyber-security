@@ -31,7 +31,7 @@ class RLPolicyActorCritic(nn.Module):
             layer_init(nn.Linear(64, 64)),
             nn.ReLU(),
             layer_init(nn.Linear(64, action_space_shape), std=0.01),
-        ).to("cuda" if torch.cuda.is_available() else "cpu")
+        )
 
         # Critic network has an input layer, 2 hidden layers with 64 nodes, and an output layer.
         # Input layer is the size of the observation space and output layer has 1 node for the predicted value.
@@ -44,7 +44,7 @@ class RLPolicyActorCritic(nn.Module):
             layer_init(nn.Linear(64, 64)),
             nn.ReLU(),
             layer_init(nn.Linear(64, 1), std=1.0),
-        ).to("cuda" if torch.cuda.is_available() else "cpu")
+        )
 
     def get_value(self, obs):
         """Gets the value for a given state x by running x through the critic network"""

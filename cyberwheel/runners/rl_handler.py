@@ -217,13 +217,13 @@ class RLHandler:
     def flatten_batch(self):
         for agent in self.agents:
             self.agents[agent]["batched"] = {}
-            self.agents[agent]["batched"]["obs"] = self.agents[agent]["obs"].reshape((-1,) + self.agents[agent]["shape"])
-            self.agents[agent]["batched"]["logprobs"] = self.agents[agent]["logprobs"].reshape(-1)
-            self.agents[agent]["batched"]["actions"] = self.agents[agent]["actions"].reshape(-1)
-            self.agents[agent]["batched"]["advantages"] = self.agents[agent]["advantages"].reshape(-1)
-            self.agents[agent]["batched"]["returns"] = self.agents[agent]["returns"].reshape(-1)
-            self.agents[agent]["batched"]["values"] = self.agents[agent]["values"].reshape(-1)
-            self.agents[agent]["batched"]["action_masks"] = self.agents[agent]["action_masks"].reshape(-1, self.agents[agent]["action_masks"].shape[-1])
+            self.agents[agent]["batched"]["obs"] = self.agents[agent]["obs"].reshape((-1,) + self.agents[agent]["shape"]).to(self.device)
+            self.agents[agent]["batched"]["logprobs"] = self.agents[agent]["logprobs"].reshape(-1).to(self.device)
+            self.agents[agent]["batched"]["actions"] = self.agents[agent]["actions"].reshape(-1).to(self.device)
+            self.agents[agent]["batched"]["advantages"] = self.agents[agent]["advantages"].reshape(-1).to(self.device)
+            self.agents[agent]["batched"]["returns"] = self.agents[agent]["returns"].reshape(-1).to(self.device)
+            self.agents[agent]["batched"]["values"] = self.agents[agent]["values"].reshape(-1).to(self.device)
+            self.agents[agent]["batched"]["action_masks"] = self.agents[agent]["action_masks"].reshape(-1, self.agents[agent]["action_masks"].shape[-1]).to(self.device)
             self.agents[agent]["clipfracs"] = []
     
     def update_policy(self, mb_inds):
