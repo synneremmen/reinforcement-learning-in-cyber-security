@@ -10,6 +10,31 @@
 #
 # Phases: discovery, lateral_movement, privilege_escalation, impact
 
+USER:
+  discovery:
+    - T1083      # File and Directory Discovery
+    - T1040      # Network Sniffing
+    - T1012      # Query Registry
+    - T1082      # System Information Discovery
+    - T1614.001  # System Language Discovery
+  lateral-movement:
+    - T1021.003  # Remote Services: DCOM
+    - T1550.002  # Use Alternate Authentication Material: Pass the Hash
+    - T1550.003  # Use Alternate Authentication Material: Pass the Ticket
+    - T1563.002  # Remote Service Session Hijacking: RDP
+    - T1021.001  # Remote Services: Remote Desktop Protocol
+    - T1021.002  # Remote Services: SMB/Windows Admin Shares
+    - T1072      # Software Deployment Tools
+    - T1021.006  # Remote Services: Windows Remote Management
+  privilege-escalation:
+    - T1548.002  # Abuse Elevation Control Mechanism: Bypass User Account Control
+    - T1078.001  # Valid Accounts: Default Accounts
+    - T1134.004  # Parent PID Spoofing
+    - T1134.005  # SID-History Injection
+    - T1134.001  # Token Impersonation/Theft
+  impact:
+    - T1491.001  # Defacement: Internal Defacement
+
 WEB_SERVER:
   discovery:
     - T1087.002  # Gather Victim Identity - Domain Account
@@ -115,7 +140,7 @@ PROXY_SERVER:
     - T1083      # File and Directory Discovery
     - T1082      # System Information Discovery
   lateral-movement:
-    - T1040      # Network Traffic Sniffing
+    # - T1040      # Network Traffic Sniffing [MARKED: phase_not_in_kill_chain_phases]
     - T1021.003  # Remote Services: RDP
     - T1570      # Lateral Tool Transfer
     - T1550.002  # Use Alternate Authentication Material: Pass the Hash
@@ -146,10 +171,10 @@ SSH_JUMP_SERVER:
     - T1550.003  # Use Alternate Authentication Material: Pass the Ticket
   privilege-escalation:
     - T1078.001  # Valid Accounts: Default Accounts
-    - T1548.001  # Abuse Elevation Control Mechanism: Setuid and Setgid
-    - T1548.003  # Abuse Elevation Control Mechanism: Sudo and Sudo Caching
-    - T1546.004  # Event Triggered Execution: Unix Shell Configuration Modification
-    - T1546.005  # Event Triggered Execution: Trap
+    # - T1548.001  # Abuse Elevation Control Mechanism: Setuid and Setgid [MARKED: no_windows_support]
+    # - T1548.003  # Abuse Elevation Control Mechanism: Sudo and Sudo Caching [MARKED: no_windows_support]
+    # - T1546.004  # Event Triggered Execution: Unix Shell Configuration Modification [MARKED: no_windows_support]
+    # - T1546.005  # Event Triggered Execution: Trap [MARKED: no_windows_support]
     - T1053.002  # Scheduled Task/Job: At (Windows)
     - T1053.005  # Scheduled Task/Job: Scheduled Task
   impact:
