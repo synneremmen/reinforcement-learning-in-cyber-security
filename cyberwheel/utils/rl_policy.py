@@ -63,8 +63,8 @@ class RLPolicyActorCritic(nn.Module):
 
         probs = Categorical(logits=logits)
         if action is None:
-            action = action.to("cuda" if torch.cuda.is_available() else "cpu")
             action = probs.sample()
+        action = action.to("cuda" if torch.cuda.is_available() else "cpu")
         return action, probs.log_prob(action), probs.entropy(), self.critic(obs)
     
 
