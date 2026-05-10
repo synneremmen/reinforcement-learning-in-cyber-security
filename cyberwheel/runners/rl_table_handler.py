@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import os
+import yaml
 
 class RLTableHandler:
 
@@ -369,15 +370,36 @@ class RLTableHandler:
         self.agents["red"]["policy"].q_table = new_q_table
 
     def get_action_mapping(self, path="/cyberwheel/data/configs/red_agent/rl_red_complex.yaml"):
-        # mapping of new actions given indicies of old found in yaml file
-        with open(path, "r") as f:
-            data=f.read()
-        phases = {"portscan": 0, "pingsweep": 0, "discovery": 0, "lateral-movement": 0, "privilege-escalation": 0, "impact": 0}
-        action_data = data.split("actions:")[1].strip()
-        for action in action_data.split("\n\n"):
-            phase = action.split("phase:")[1].strip()
-            phases[phase] += 1
-        self.mapping = phases
+        # complex action initialized from abstract parent action
+        complex_path = Path(path)
+        if not complex_path.exists():
+            complex_path = files("cyberwheel.data.configs.red_agent").joinpath("rl_red_complex.yaml")
+
+        abstract_path = files("cyberwheel.data.configs.red_agent").joinpath("rl_red_agent.yaml")
+
+        with open(abstract_path, "r") as f:
+            abstract_config = yaml.safe_load(f)
+        with open(complex_path, "r") as f:
+            complex_config = yaml.safe_load(f)
+
+        abstract_actions = list(abstract_config["actions"].keys())
+        phase_to_index = {phase: i for i, phase in enumerate(abstract_actions)} # phase: index
+        complex_actions = complex_config["actions"]
+
+        phase_counts = {phase: 0 for phase in abstract_actions}
+        parent_indices = []
+
+        # count num action with phase
+        for action_class in complex_actions.values():
+            phase = action_class["phase"]
+            if phase not in phase_to_index:
+                raise ValueError(f"Unknown phase '{phase}' in complex red agent config")
+            phase_counts[phase] += 1
+            parent_indices.append(phase_to_index[phase]) # create list of phase indicies
+
+        self.mapping = phase_counts
+        self.abstract_action_order = abstract_actions
+        self.parent_indices = parent_indices
 
     def get_new_action_values(self, action_values, method):
         """
@@ -389,9 +411,13 @@ class RLTableHandler:
         Returns:
         - new_action_values: tensor of action values for new actions (after expansion)
         """
-        if not self.mapping:
+        if not getattr(self, "mapping", None):
             raise ValueError("Action mapping is empty. Run get_action_mapping() before expanding the model.")
-        repeats = list(self.mapping.values())
+        if not getattr(self, "parent_indices", None):
+            raise ValueError("Parent indices are empty. Run get_action_mapping() before expanding the model.")
+
+        repeats = [self.mapping[phase] for phase in self.abstract_action_order]
+        num_abstract_actions = len(repeats)
 
         if method == "softmax":
             # convert action values to probabilities
@@ -411,12 +437,21 @@ class RLTableHandler:
         else:
             raise ValueError(f"Invalid method '{method}' for table based expansion. Must be 'softmax' or 'copy_values'.")
 
-        for i, val in enumerate(values):
-            # repeat according to mapping, divide value by number of repeats to keep total probability mass the same
-            num_repeat = repeats[i % len(repeats)]
-            new_val = val / num_repeat
-            repeated_vals = new_val.repeat(num_repeat)
-            new_values = torch.cat([new_values, repeated_vals])
+        if values.numel() % num_abstract_actions != 0:
+            raise ValueError(
+                f"Old action vector length {values.numel()} is not divisible by "
+                f"number of abstract actions {num_abstract_actions}."
+            )
+
+        num_hosts = values.numel() // num_abstract_actions
+        parent_indices = self.parent_indices
+
+        for host_idx in range(num_hosts):
+            host_offset = host_idx * num_abstract_actions
+            for parent_idx in parent_indices:
+                parent_val = values[host_offset + parent_idx]
+                num_children = repeats[parent_idx]
+                new_values = torch.cat([new_values, (parent_val / num_children).unsqueeze(0)])
 
         # append last action "nothing" value at the end
         new_values = torch.cat([new_values, nothing_val]) # nothing (last action)

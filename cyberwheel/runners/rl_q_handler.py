@@ -8,6 +8,7 @@ from cyberwheel.utils import RLPolicyParameterized
 from gymnasium.vector import VectorEnv
 
 from importlib.resources import files
+import yaml
 
 import numpy as np
 import torch
@@ -386,15 +387,28 @@ class RLParamHandler:
         self._reset_red_diagnostics()
 
     def get_action_mapping(self, path="/cyberwheel/data/configs/red_agent/rl_red_complex.yaml"):
-        # mapping of new actions given indicies of old found in yaml file
-        with open(path, "r") as f:
-            data=f.read()
-        phases = {"portscan": 0, "pingsweep": 0, "discovery": 0, "lateral-movement": 0, "privilege-escalation": 0, "impact": 0}
-        action_data = data.split("actions:")[1].strip()
-        for action in action_data.split("\n\n"):
-            phase = action.split("phase:")[1].strip()
-            phases[phase] += 1
-        self.mapping = phases
+        complex_path = Path(path)
+        if not complex_path.exists():
+            complex_path = files("cyberwheel.data.configs.red_agent").joinpath("rl_red_complex.yaml")
+
+        abstract_path = files("cyberwheel.data.configs.red_agent").joinpath("rl_red_agent.yaml")
+
+        with open(abstract_path, "r") as f:
+            abstract_config = yaml.safe_load(f)
+        with open(complex_path, "r") as f:
+            complex_config = yaml.safe_load(f)
+
+        abstract_actions = list(abstract_config["actions"].keys())
+        phase_counts = {phase: 0 for phase in abstract_actions}
+
+        for action_class in complex_config["actions"].values():
+            phase = action_class["phase"]
+            if phase not in phase_counts:
+                raise ValueError(f"Unknown phase '{phase}' in complex red agent config")
+            phase_counts[phase] += 1
+
+        self.mapping = phase_counts
+        self.abstract_action_order = abstract_actions
 
     def expand_model(self, abstract_policy, args, writer=None):
         print(f"Expanding model from action space {abstract_policy.action_space_shape} to {self.agents['red']['policy'].action_space_shape} using method '{args.method}'")
