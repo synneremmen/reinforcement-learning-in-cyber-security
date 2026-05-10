@@ -23,6 +23,8 @@ def train_expanded_agents(args: YAMLConfig):
         args.save_frequency = 1
 
     args.evaluation = False
+    print()
+    print("*** Abstract agent ***")
 
     # retrieve abstract agent for policy type
     # parameterized-RedAgentvsRLBlueAgent
@@ -44,14 +46,12 @@ def train_expanded_agents(args: YAMLConfig):
     # Unique experiment name if empty
     if not args.experiment_name:
         # args.experiment_name = f"{os.path.basename(__file__).rstrip('.py')}_{args.seed}_{int(time.time())}"
-        args.experiment_name = f"train-{args.policy_type}-{args.max_num_hosts}-{args.seed}"
+        args.experiment_name = f"train-{args.policy_type}-rl_red_agent-{args.max_num_hosts}-{args.seed}"
 
     args.agents["red"] = "rl_red_agent.yaml"
     abstract_trainer = RLTrainer(args)
     abstract_trainer.configure_training()
 
-    print()
-    print("*** Abstract agent ***")
     abstract_trainer.handler.load_models()
 
     abstract_policy = abstract_trainer.handler.agents["red"]["policy"]
@@ -59,7 +59,7 @@ def train_expanded_agents(args: YAMLConfig):
     print()
     print("*** Expanding agent ****")
     args.seed = args.seed + 1  # change seed to get different envs for expanded agent training
-    args.experiment_name = f"train_expansion-{args.policy_type}-{args.max_num_hosts}-{args.seed}-{args.method}{ '-reuse' if getattr(args, 'reuse_model', True) else '' }-ExpandedRedAgentvsRLBlueAgent"
+    args.experiment_name = f"train_expansion-{args.policy_type}-rl_red_complex-{args.max_num_hosts}-{args.seed}-{args.method}{ '-reuse' if getattr(args, 'reuse_model', True) else '' }"
     args.agents["red"] = "rl_red_complex.yaml"
     expanded_trainer = RLTrainer(args)
     expanded_trainer.configure_training()  
