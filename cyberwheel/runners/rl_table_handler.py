@@ -355,13 +355,17 @@ class RLTableHandler:
         # each action in the old action space corresponds to one or multiple actions in the new action space
         """
         How to choose values of new actions???
-        Q(aij) = Q(bi) + Q(aij|bi)
-        pi(aij) = pi(bi)pi(aij|bi)
+        q-values: Q(aij) = Q(bi) + Q(aij|bi)
+        probabilities: pi(aij) = pi(bi)pi(aij|bi)
+        kl divergence
         """
-        for state, action_values in old_q_table.items():
-            new_q_table[state] = self.get_new_action_values(action_values, args.method)
+        if args.method in ["softmax", "copy_values"]:
+            for state, action_values in old_q_table.items():
+                new_q_table[state] = self.get_new_action_values(action_values, args.method)
+        elif args.method == "kl_divergence":
+            raise NotImplementedError("KL divergence method not implemented yet")
 
-        print("New Q-table initialized with", len(new_q_table), "states and", new_q_table[list(new_q_table.keys())[0]].shape, "actions per state.")
+        print("New Q-table initialized with", len(new_q_table), "states and", new_action_shape, "actions per state.")
         self.agents["red"]["policy"].q_table = new_q_table
 
     def get_action_mapping(self, path="/cyberwheel/data/configs/red_agent/rl_red_complex.yaml"):
