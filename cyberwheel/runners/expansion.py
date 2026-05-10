@@ -22,6 +22,8 @@ def train_expanded_agents(args: YAMLConfig):
     if args.save_frequency == 0:
         args.save_frequency = 1
 
+    args.evaluation = False
+
     # retrieve abstract agent for policy type
     # parameterized-RedAgentvsRLBlueAgent
     # tabular-RedAgentvsRLBlueAgent
