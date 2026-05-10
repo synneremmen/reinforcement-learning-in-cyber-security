@@ -75,7 +75,9 @@ def train_expanded_agents(args: YAMLConfig):
         # update envs each training step if leader and entry host are random (initial method to test)
         red_agent = expanded_trainer.handler.envs.envs[0].red_agent
         if red_agent.leader == "random" and red_agent.entry_host == "random":
-            expanded_trainer.handler.envs = expanded_trainer.get_envs()  # reinitialize envs (entry host and leader will be reselected)
+            if update % 100 == 0:
+                seed = expanded_trainer.args.seed + update
+                expanded_trainer.handler.envs = expanded_trainer.get_envs(seed=seed)  
         expanded_trainer.train(update)
 
     abstract_trainer.close()
