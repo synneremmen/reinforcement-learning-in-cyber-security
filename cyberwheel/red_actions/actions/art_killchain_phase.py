@@ -259,7 +259,7 @@ class ARTKillChainPhase(ARTAction):
             #         print(f"No techniques allowed for {host} in phase {self.name} on host {host.name}")
 
             if len(candidates) == 0:
-                print(f"No valid techniques found for host {host.name} of type {host.host_type} and action {self.name}, failing action")
+                print(f"No valid techniques found for host {host.name} of type {host.host_type.name} and action {self.name}, failing action")
                 self.action_results.attack_success = False
                 return self.action_results
             
