@@ -450,7 +450,7 @@ class RLTableHandler:
             host_offset = host_idx * num_abstract_actions
             for parent_idx in parent_indices:
                 parent_val = values[host_offset + parent_idx]
-                num_children = repeats[parent_idx]
+                num_children = 1 # repeats[parent_idx]
                 new_values = torch.cat([new_values, (parent_val / num_children).unsqueeze(0)])
 
         # append last action "nothing" value at the end
