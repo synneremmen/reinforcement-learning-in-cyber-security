@@ -352,14 +352,20 @@ class RLPolicyTabular(nn.Module):
             self.epsilon = args.epsilon
             self.learning_rate = args.learning_rate
             self.initial_lr = args.learning_rate
+            self.initial_epsilon = getattr(self.args, 'epsilon', 0.5) 
+            self.final_epsilon = getattr(self.args, 'final_epsilon', 0.01)
             self.decay_power = getattr(args, "decay_power", 0.001)
             self.total_updates = getattr(args, "num_updates", getattr(args, "total_timesteps", 1))
             self.update = 0
         self.num_hosts = getattr(args, "num_hosts", args.max_num_hosts)
 
+    def decay_epsilon(self):
+        self.epsilon = max(self.epsilon - (self.initial_epsilon - self.final_epsilon) / self.args.total_timesteps, self.final_epsilon)
+
     def decay_lr(self):
         # linear decay
-        self.learning_rate = self.initial_lr / (1 + self.decay_rate * self.update)
+        self.learning_rate = max(self.learning_rate - (self.initial_lr - self.final_lr) / self.args.total_timesteps, self.final_lr)
+        # self.learning_rate = self.initial_lr / (1 + self.decay_rate * self.update)
         # progress = min(self.update, self.total_updates) / max(self.total_updates, 1)
         # self.learning_rate = self.initial_lr * (1 - progress) ** self.decay_power
 
@@ -443,7 +449,7 @@ class RLPolicyTabular(nn.Module):
         else:
             return self.greedy_action(obs, mask)
 
-    def update_q_table(self, obs, action, reward, next_obs, done, next_action_mask=None, alpha=0.1, gamma=0.99):
+    def update_q_table(self, obs, action, reward, next_obs, done, next_action_mask=None, gamma=0.99):
         """Update Q-table using Q-learning update rule"""
         done = bool(torch.as_tensor(done).item())
         action_idx = int(torch.as_tensor(action).item())
@@ -459,7 +465,6 @@ class RLPolicyTabular(nn.Module):
 
         self._get_state_q(obs)[action_idx] += update_value
         self.update += 1
-        # self.decay_lr()
         return float(td_error)
         # q(s,a) = q(s,a) + alpha(R + gamma maxq(nexts,a) - q(s,a))
         # q(s,a) = q(s,a) + alpha * td_error

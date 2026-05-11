@@ -20,10 +20,7 @@ class RLTableHandler:
 
         self.agents = {}
         self.static_agents = static_agents
-        self.episode = 1
         self.load = getattr(self.args, 'load', False)
-        self.initial_epsilon = getattr(self.args, 'epsilon', 0.2)
-        self.do_decay_epsilon = getattr(self.args, 'decay_epsilon', False)
 
         for agent in agents:
             self.agents[agent] = agents[agent]
@@ -112,6 +109,8 @@ class RLTableHandler:
                 self.agents[agent]["actions"][step][env_idx] = action
             
             policy_action[agent] = self.agents[agent]["actions"][step].cpu().numpy()
+            self.agents[agent]["policy"].decay_epsilon()
+            self.agents[agent]["policy"].decay_lr()
             # self.[step] = self.next_done 
 
         obs, reward, done, _, info = self.envs.step(policy_action) # take a step in the environment
@@ -231,9 +230,6 @@ class RLTableHandler:
                 self.agents[agent]["td_update_mean"] = 0.0
                 self.agents[agent]["td_update_abs_mean"] = 0.0
                 self.agents[agent]["td_update_max_abs"] = 0.0
-        self.episode += 1
-        if self.do_decay_epsilon:
-            self.decay_epsilon(self.episode)
 
     def calculate_explained_variance(self):
         pass
@@ -296,7 +292,6 @@ class RLTableHandler:
                 self.agents[agent]["policy"].epsilon = self.initial_epsilon
                 
                 self.global_step = 0
-                self.episode = 1
                 self._reset_red_diagnostics()
             
                 print(f"Loaded {agent} with fresh history (epsilon={self.initial_epsilon})")
@@ -336,16 +331,6 @@ class RLTableHandler:
             self.agents[agent]["rewards"] = torch.zeros((self.args.num_steps, self.args.num_envs)).to(self.device)
             self.agents[agent]["action_masks"] = torch.zeros((self.args.num_steps, self.args.num_envs, self.agents[agent]["max_action_space_size"]), dtype=torch.bool).to(self.device)
         self._reset_red_diagnostics()
-
-    def decay_epsilon(self, episode: int):
-        """Decay epsilon for epsilon-greedy exploration"""
-        for agent in self.agents:
-            if hasattr(self.agents[agent]["policy"], 'epsilon'):
-                initial_epsilon = getattr(self.args, 'epsilon', 0.2) # self.initial_epsilon if self.initial_epsilon is not None else getattr(self.args, 'initial_epsilon', 0.2)
-                final_epsilon = getattr(self.args, 'final_epsilon', 0.01)
-                decay_episodes = getattr(self.args, 'epsilon_decay_episodes', self.args.num_updates)  # Decay over all training updates
-                epsilon = initial_epsilon - (initial_epsilon - final_epsilon) * min(episode / decay_episodes, 1.0)
-                self.agents[agent]["policy"].epsilon = epsilon
 
     def expand_model(self, old_policy, args, writer=None):
         old_action_shape = old_policy.action_space_shape
@@ -450,7 +435,7 @@ class RLTableHandler:
             host_offset = host_idx * num_abstract_actions
             for parent_idx in parent_indices:
                 parent_val = values[host_offset + parent_idx]
-                num_children = 1 # repeats[parent_idx]
+                num_children = repeats[parent_idx]
                 new_values = torch.cat([new_values, (parent_val / num_children).unsqueeze(0)])
 
         # append last action "nothing" value at the end

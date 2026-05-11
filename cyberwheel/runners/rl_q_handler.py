@@ -2,7 +2,7 @@ from collections import defaultdict, namedtuple, deque
 from pathlib import Path
 
 from torch import optim
-from torch.optim.lr_scheduler import PolynomialLR
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from cyberwheel.utils import RLPolicyParameterized
 from gymnasium.vector import VectorEnv
@@ -38,7 +38,6 @@ class RLParamHandler:
         #print(agents)
         self.agents = {}
         self.static_agents = static_agents
-        self.episode = 1
         self.load = getattr(self.args, 'load', False)
         memory_size = 100000
         self.replay_buffer = replay_buffer(memory_size, list(agents.keys()))
@@ -51,7 +50,7 @@ class RLParamHandler:
             self.agents[agent]["optimizer"] = optim.Adam([
                 { 'params': list(self.agents[agent]["policy"].model.parameters()),  'lr': float(self.args.learning_rate),  'eps': 1e-3 },
             ])
-            self.agents[agent]["scheduler"] = PolynomialLR(self.agents[agent]["optimizer"], total_iters=self.args.total_timesteps, power=0.8)
+            self.agents[agent]["scheduler"] = CosineAnnealingLR(self.agents[agent]["optimizer"], T_max=self.args.total_timesteps)
             self.agents[agent]["lossfn"] = torch.nn.MSELoss()
 
         if self.load:
@@ -138,6 +137,7 @@ class RLParamHandler:
             # Execute the selected action in the environment to collect experience for training.
             policy_action[agent] = self.agents[agent]["actions"][step].cpu().numpy()
             self.agents[agent]["policy"].decay_epsilon()
+            self.agents[agent]["scheduler"].step()
         #print(policy_action)
 
         # print(f"Step {step}: Executing actions {policy_action} in the environment.")
@@ -276,7 +276,7 @@ class RLParamHandler:
                 if param.grad is not None:
                     param.grad.data.clamp_(-5, 5)  # gradient clipping
             self.agents[agent]["optimizer"].step()
-            # self.agents[agent]["scheduler"].step()
+            
             if self.agents[agent]["policy"].use_target and update // 100 == 0:  # soft update every 100 updates
                 self.agents[agent]["policy"].soft_update()
 
@@ -351,7 +351,7 @@ class RLParamHandler:
                     self.agents[agent]["optimizer"] = optim.Adam([
                         {"params": list(policy.model.parameters()), "lr": float(self.args.learning_rate), "eps": 1e-3},
                     ])
-                    self.agents[agent]["scheduler"] = PolynomialLR(self.agents[agent]["optimizer"], total_iters=self.args.total_timesteps, power=0.8)
+                    self.agents[agent]["scheduler"] = CosineAnnealingLR(self.agents[agent]["optimizer"], T_max=self.args.total_timesteps)
 
                 model_state_dict = {
                     key[6:] if key.startswith("model.") else key: value
@@ -362,7 +362,6 @@ class RLParamHandler:
                 if policy.use_target:
                     policy.set_target_model()
 
-                self.episode = 1
                 self._reset_red_diagnostics()
             
                 # print(f"Loaded {agent} with fresh history (epsilon={self.initial_epsilon})")
