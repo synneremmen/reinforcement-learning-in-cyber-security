@@ -276,6 +276,10 @@ class RLPolicyParameterized(nn.Module):
         greedy_action = torch.argmax(logits, dim=1)
         return greedy_action
     
+    def _extract_linear_layers(self, model):
+        """Extract all linear layers from a model (works with DuelingQNetwork, DeepQNetwork, etc.)."""
+        return [m for m in model.modules() if isinstance(m, nn.Linear)]
+    
     def copy_params(self, old_policy, mapping=None):
         """Copy the weights from the old policy to the new policy, using the mapping to determine which weights correspond to which actions."""
         if mapping is None:
@@ -284,7 +288,10 @@ class RLPolicyParameterized(nn.Module):
         new_model = self._build_model([64, 64])
         values = list(mapping.values())
         with torch.no_grad():
-            for old_layer, new_layer in zip(old_policy.model, new_model):
+            old_linear_layers = self._extract_linear_layers(old_policy.model)
+            new_linear_layers = self._extract_linear_layers(new_model)
+            
+            for old_layer, new_layer in zip(old_linear_layers, new_linear_layers):
                 out_idx = 0
                 # create new weigths with new_action_space_shape and divide the old weights on the corrospending features in the new weight matrix
                 if new_layer.out_features == self.action_space_shape:
@@ -301,8 +308,9 @@ class RLPolicyParameterized(nn.Module):
                     # last layer, output layer that we want to expand
                 else:
                     # copy weights and biases for the overlapping part of the layers
-                    new_layer.weight.copy_(old_layer.weight)
-                    new_layer.bias.copy_(old_layer.bias)
+                    if old_layer.weight.shape == new_layer.weight.shape:
+                        new_layer.weight.copy_(old_layer.weight)
+                        new_layer.bias.copy_(old_layer.bias)
         return new_model
 
     def increase_depth(self, old_policy=None, reuse_model=True):
@@ -312,8 +320,11 @@ class RLPolicyParameterized(nn.Module):
         new_model = self._build_model(self.hidden_layers)
         if reuse_model:
             with torch.no_grad():
-                for old_layer, new_layer in zip(old_policy.model, new_model):
-                    if isinstance(old_layer, nn.Linear) and isinstance(new_layer, nn.Linear):
+                old_linear_layers = self._extract_linear_layers(old_policy.model)
+                new_linear_layers = self._extract_linear_layers(new_model)
+                
+                for old_layer, new_layer in zip(old_linear_layers, new_linear_layers):
+                    if old_layer.weight.shape == new_layer.weight.shape:
                         new_layer.weight.copy_(old_layer.weight)
                         new_layer.bias.copy_(old_layer.bias)
             print("Increased depth and reused model weights for layers with matching shapes.")
@@ -352,11 +363,9 @@ class RLPolicyTabular(nn.Module):
             self.epsilon = args.epsilon
             self.learning_rate = args.learning_rate
             self.initial_lr = args.learning_rate
+            self.final_lr = getattr(self.args, 'final_lr', 0.0001)
             self.initial_epsilon = getattr(self.args, 'epsilon', 0.5) 
             self.final_epsilon = getattr(self.args, 'final_epsilon', 0.01)
-            self.decay_power = getattr(args, "decay_power", 0.001)
-            self.total_updates = getattr(args, "num_updates", getattr(args, "total_timesteps", 1))
-            self.update = 0
         self.num_hosts = getattr(args, "num_hosts", args.max_num_hosts)
 
     def decay_epsilon(self):
@@ -366,8 +375,6 @@ class RLPolicyTabular(nn.Module):
         # linear decay
         self.learning_rate = max(self.learning_rate - (self.initial_lr - self.final_lr) / self.args.total_timesteps, self.final_lr)
         # self.learning_rate = self.initial_lr / (1 + self.decay_rate * self.update)
-        # progress = min(self.update, self.total_updates) / max(self.total_updates, 1)
-        # self.learning_rate = self.initial_lr * (1 - progress) ** self.decay_power
 
     def obs_to_state(self, obs):
         obs_tensor = torch.as_tensor(obs, device=self.device)
@@ -464,7 +471,6 @@ class RLPolicyTabular(nn.Module):
         update_value = self.learning_rate * td_error
 
         self._get_state_q(obs)[action_idx] += update_value
-        self.update += 1
         return float(td_error)
         # q(s,a) = q(s,a) + alpha(R + gamma maxq(nexts,a) - q(s,a))
         # q(s,a) = q(s,a) + alpha * td_error

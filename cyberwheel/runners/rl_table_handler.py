@@ -265,18 +265,17 @@ class RLTableHandler:
             agent_paths[agent] = agent_path
         return agent_paths
 
-    def load_models(self, name="red_agent"):
-        """Load Q-tables from disk"""
+    def load_models(self, experiment_name):
         for agent in self.agents:
             if self.args.nrec:
-                load_path = Path("/persistent01/cyberwheel/models") / self.args.experiment_name
+                load_path = Path("/persistent01/cyberwheel/models") / experiment_name
             elif self.args.drive:
-                load_path = Path("/content/drive/MyDrive/RLCS/models") / self.args.experiment_name
+                load_path = Path("/content/drive/MyDrive/RLCS/models") / experiment_name
             else:
-                load_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
-            
-            agent_path = load_path.joinpath(f"{name}.pt")
+                load_path = files("cyberwheel.data.models").joinpath(experiment_name)
+            agent_path = load_path.joinpath(f"{agent}_agent.pt")
             print(f"Loading {agent} agent from: {agent_path}")
+            
             if os.path.exists(agent_path):
                 save_dict = torch.load(agent_path, map_location=torch.device(self.device))
                 
@@ -287,13 +286,13 @@ class RLTableHandler:
                 )
                 for state, q_values in q_table_dict.items():
                     self.agents[agent]["policy"].q_table[state] = torch.as_tensor(q_values, device=self.device)
-
-                self.agents[agent]["policy"].epsilon = self.initial_epsilon
                 
                 self.global_step = 0
                 self._reset_red_diagnostics()
             
-                print(f"Loaded {agent} with fresh history (epsilon={self.initial_epsilon})")
+                print(f"Loaded {agent} of size {len(q_table_dict)} states, global step set to {self.global_step}")
+            else:
+                raise FileNotFoundError(f"Checkpoint file for {agent} not found at {agent_path}. Starting with fresh model.")
                 
                 # Restore epsilon if saved
                 # if 'epsilon' in save_dict:

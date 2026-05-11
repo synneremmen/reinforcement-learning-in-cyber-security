@@ -46,7 +46,7 @@ class RLHandler:
             # TODO: Reconfigure LR
 
         if self.args.load:
-            self.load_models(getattr(self.args, 'load_from_experiment', self.args.experiment_name))
+            self.load_models()
 
     def _reset_red_diagnostics(self):
         self.red_action_attempts = defaultdict(int)
@@ -330,12 +330,14 @@ class RLHandler:
             else:
                 load_path = files("cyberwheel.data.models").joinpath(experiment_name)
             agent_path = load_path.joinpath(f"{agent}_agent.pt")
+            print(f"Loading {agent} agent from: {agent_path}")
+
             if os.path.exists(agent_path):
                 self.agents[agent]["policy"].load_state_dict(torch.load(agent_path, map_location=self.device))
                 print(f"Loaded model for agent '{agent}' from '{agent_path}'")
+                self._reset_red_diagnostics()
             else:
-                print(f"No model path provided for agent '{agent}', skipping load.")
-        self._reset_red_diagnostics()
+                raise FileNotFoundError(f"Checkpoint file for {agent} not found at {agent_path}. Starting with fresh model.")
     
     def log_training_metrics(self, writer):
         for agent in self.agents:

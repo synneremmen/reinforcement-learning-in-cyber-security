@@ -52,13 +52,16 @@ def train_expanded_agents(args: YAMLConfig):
     abstract_trainer = RLTrainer(args)
     abstract_trainer.configure_training()
 
-    abstract_trainer.handler.load_models()
-
+    load_from_experiment = getattr(args, 'load_from_experiment', None)
+    if load_from_experiment is None:
+        raise ValueError("Must specify experiment to load abstract agent from with --load_from_experiment when training expanded agents.")
+    
+    abstract_trainer.handler.load_models(load_from_experiment)
     abstract_policy = abstract_trainer.handler.agents["red"]["policy"]
 
     print()
     print("*** Expanding agent ****")
-    args.seed = args.seed + 1  # change seed to get different envs for expanded agent training
+    args.seed = args.seed # + 1  # change seed to get different envs for expanded agent training
     args.experiment_name = f"train_expansion-{args.policy_type}-rl_red_complex-{args.max_num_hosts}-{args.seed}-{args.method}{ '-reuse' if getattr(args, 'reuse_model', True) else '' }"
     args.agents["red"] = "rl_red_complex.yaml"
     expanded_trainer = RLTrainer(args)
@@ -79,6 +82,7 @@ def train_expanded_agents(args: YAMLConfig):
                 seed = expanded_trainer.args.seed + update
                 expanded_trainer.handler.envs = expanded_trainer.get_envs(seed=seed)  
         expanded_trainer.train(update)
+    expanded_trainer.handler.save_models() 
 
     abstract_trainer.close()
     # expanded_probs_trainer.close()

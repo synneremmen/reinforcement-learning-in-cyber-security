@@ -64,5 +64,6 @@ def train_cyberwheel(args: YAMLConfig):
                 seed = trainer.args.seed + update # change seed each update to get different networks
                 trainer.handler.envs = trainer.get_envs(seed=seed)  # reinitialize envs (entry host and leader will be reselected)
         trainer.train(update)
+    trainer.handler.save_models()  # save final models after training is done
 
     trainer.close()

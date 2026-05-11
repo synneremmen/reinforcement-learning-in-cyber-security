@@ -313,18 +313,17 @@ class RLParamHandler:
 
         return agent_paths
     
-    def load_models(self, name="red_agent"):
-        """Load Q-tables from disk"""
+    def load_models(self, experiment_name):
         for agent in self.agents:
             if self.args.nrec:
-                load_path = Path("/persistent01/cyberwheel/models") / self.args.experiment_name
+                load_path = Path("/persistent01/cyberwheel/models") / experiment_name
             elif self.args.drive:
-                load_path = Path("/content/drive/MyDrive/RLCS/models") / self.args.experiment_name
+                load_path = Path("/content/drive/MyDrive/RLCS/models") / experiment_name
             else:
-                load_path = files("cyberwheel.data.models").joinpath(self.args.experiment_name)
-            
-            agent_path = load_path.joinpath(f"{name}.pt")
+                load_path = files("cyberwheel.data.models").joinpath(experiment_name)
+            agent_path = load_path.joinpath(f"{agent}_agent.pt")
             print(f"Loading {agent} agent from: {agent_path}")
+            
             if os.path.exists(agent_path):
                 checkpoint = torch.load(agent_path, map_location=torch.device(self.device))
                 state_dict = checkpoint["state_dict"] if isinstance(checkpoint, dict) and "state_dict" in checkpoint else checkpoint
@@ -361,9 +360,10 @@ class RLParamHandler:
                 policy.model.load_state_dict(model_state_dict)
                 if policy.use_target:
                     policy.set_target_model()
-
+                
                 self._reset_red_diagnostics()
-            
+            else:
+                raise FileNotFoundError(f"Checkpoint file for {agent} not found at {agent_path}. Starting with fresh model.")            
                 # print(f"Loaded {agent} with fresh history (epsilon={self.initial_epsilon})")
     
     def log_training_metrics(self, writer):
@@ -430,15 +430,15 @@ class RLParamHandler:
     def policy_distallation(self, abstract_policy, args, writer=None):
         if args.reuse_model:
             print("Reusing old model weights for layers with matching shapes.")
-            new_model = self.agents["red"]["policy"].increase_depth(old_policy=abstract_policy)
+            self.agents["red"]["policy"].model = self.agents["red"]["policy"].increase_depth(old_policy=abstract_policy)
         else:
-            new_model = self.agents["red"]["policy"]._build_model(self.agents["red"]["policy"].hidden_layers)
-        optimizer = optim.Adam(new_model.parameters())
+            self.agents["red"]["policy"].model = self.agents["red"]["policy"]._build_model(self.agents["red"]["policy"].hidden_layers)
+        optimizer = optim.Adam(self.agents["red"]["policy"].model.parameters())
         global_step = 0
         args.kl_divergence_steps
         num_updates = args.kl_divergence_steps // self.args.num_steps
         abstract_policy.model.eval()
-        new_model.model.train()
+        self.agents["red"]["policy"].model.train()
         print(f"Running for {args.kl_divergence_steps} steps with {num_updates} updates of KL divergence loss.")
         for _ in range(num_updates):
             self.reset()
@@ -447,10 +447,10 @@ class RLParamHandler:
                 self.update_action_masks(step)
                 if args.expand_teacher_probs:
                     with torch.no_grad():
-                        action = new_model.select_action(obs, action_mask=self.agents["red"]["action_masks"][step][0])
+                        action = self.agents["red"]["policy"].select_action(obs, action_mask=self.agents["red"]["action_masks"][step][0])
                         probs_teacher = abstract_policy.get_probabilities(obs, mode="teacher")
                         # teacher is smaller than student, so we must expand the teacher probabilities to match the student's action space before calculating KL divergence
-                        expanded_probs_teacher = torch.zeros((1, new_model.action_space_shape), device=self.device)
+                        expanded_probs_teacher = torch.zeros((1, self.agents["red"]["policy"].action_space_shape), device=self.device)
                         idx = 0
                         teacher_idx = 0
                         for host in range(self.args.num_hosts):
@@ -460,26 +460,26 @@ class RLParamHandler:
                                 idx += count
                                 teacher_idx += 1
                         expanded_probs_teacher[:,-1] = probs_teacher[:,-1]
-                    log_probs_student = new_model.get_probabilities(obs, mode="student", expand_teacher_probs=args.expand_teacher_probs)
+                    log_probs_student = self.agents["red"]["policy"].get_probabilities(obs, mode="student", expand_teacher_probs=args.expand_teacher_probs)
                 else:
                     with torch.no_grad():
-                        action = new_model.select_action(obs, action_mask=self.agents["red"]["action_masks"][step][0])
+                        action = self.agents["red"]["policy"].select_action(obs, action_mask=self.agents["red"]["action_masks"][step][0])
                         probs_teacher = abstract_policy.get_probabilities(obs, mode="teacher")
                         expanded_probs_teacher = probs_teacher
                     # print("Teacher vs student probabilities:")
                     # print(f"Teacher: {expanded_probs_teacher}")
-                    log_probs_student = new_model.get_probabilities(obs, mode="student", mapping=self.mapping, num_hosts=self.args.num_hosts, expand_teacher_probs=args.expand_teacher_probs)
+                    log_probs_student = self.agents["red"]["policy"].get_probabilities(obs, mode="student", mapping=self.mapping, num_hosts=self.args.num_hosts, expand_teacher_probs=args.expand_teacher_probs)
                 action = action.cpu().numpy()
                 policy_action = {"red": action}
                 # print(f"Step {step}: Executing action {policy_action} in the environment.")
 
                 obs, reward, done, _, info = self.envs.step(policy_action)
                 obs = torch.tensor(obs["red"], dtype=torch.float32, device=self.device)
-                kl_loss = new_model.kl_divergence(log_probs_student, expanded_probs_teacher)
+                kl_loss = self.agents["red"]["policy"].kl_divergence(log_probs_student, expanded_probs_teacher)
                 writer.add_scalar("charts/kl_divergence_loss", kl_loss.item(), global_step)
                 # print(f"KL divergence loss: {kl_loss.item():.6f}\n")
                 optimizer.zero_grad()
                 kl_loss.backward()
                 optimizer.step()
                 global_step += 1
-        return new_model
+        return self.agents["red"]["policy"].model
