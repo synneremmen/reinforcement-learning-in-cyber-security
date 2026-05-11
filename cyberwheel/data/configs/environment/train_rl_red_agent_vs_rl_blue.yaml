@@ -1,25 +1,25 @@
 # Training Parameters
 experiment_name: #TrainRedAgent_TwoLRs_AnnealonUpdate_BothHigh_ActionMask #EmulatorIntegrationCampaign_FixedTypeObs
 deterministic: true # Whether or not the training is deterministic
-seed: 1001
-device: cuda # Which device to train on
+seed: 1000
+# seed: 1001
+device: cpu # Which device to train on
+# device: cuda
 async_env: false # Whether to run the environments in parallel
-total_timesteps: 10000000 # Total number of steps to run throughout training
+total_timesteps: 50000000 # Total number of steps to run throughout training
 num_saves: 20 # Number of times the model is evaluated and saved during the training run
 num_envs: 1 # Number of game environments to run at once (parallel if async_env == true)
-num_steps: 50 # Number of steps to run per episode
+num_steps: 100 # Number of steps to run per episode
 eval_episodes: 10 # Number of episodes to run in an evaluation
 debug_mode: false
-epsilon: 0.2
-decay_epsilon: false
+epsilon: 0.5
 decay_rate: 0.001
-alpha: 0.1
-drive: true
-nrec: false
+drive: false
+nrec: true
 eval: false
 
-num_hosts: 50
-num_subnets: 16
+num_hosts: 4
+num_subnets: 2
 
 # Environment Parameters
 environment: CyberwheelRL # Environment class to use
@@ -36,10 +36,10 @@ agents:
   # blue: rl_blue_agent.yaml
   # red: rl_red_campaign.yaml
   # red: rl_red_agent.yaml
+  # red: rl_red_complex.yaml
   red: rl_red_agent.yaml
-  # red: rl_red_agent.yaml
 
-policy_type: parameterized
+policy_type: tabular
 method: copy_values # copy_values, softmax, kl_divergence, copy_params, increase_depth
 expand_teacher_probs: false
 kl_divergence_steps: 1000
@@ -81,3 +81,6 @@ wandb_project_name: # The W&B project name if tracking
 wandb_entity: # The W&B entity if tracking
 
 load: false
+load_from_experiment: train-tabular-rl_red_agent-4-1000
+# load_from_experiment: train-parameterized-rl_red_agent-50-1000
+# load_from_experiment: train-actor_critic-rl_red_agent-50-1000
