@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from torch import nn, optim
+import yaml
 
 from cyberwheel.utils import RLPolicyActorCritic, RLPolicyTabular, RLPolicyParameterized
 from gymnasium.vector import VectorEnv, AsyncVectorEnv
@@ -184,7 +185,6 @@ class RLHandler:
         writer.add_scalar("charts/number_valid_targets", self.num_valid_targets, self.global_step)
         impact_ratio = (self.number_of_impacted_valid_targets / self.num_valid_targets) if self.num_valid_targets > 0 else 0.0
         writer.add_scalar("charts/red_impacted_valid_targets_ratio", impact_ratio, self.global_step)
-        writer.add_scalar("charts/red_learning_rate", self.agents[agent]["optimizer"].param_groups[0]["lr"], self.global_step)
 
         for phase in ["discovery", "impact"]:
             attempts = self.red_action_attempts[phase]

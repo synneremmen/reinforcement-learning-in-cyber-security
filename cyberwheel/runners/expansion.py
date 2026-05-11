@@ -29,7 +29,7 @@ def train_expanded_agents(args: YAMLConfig):
     # retrieve abstract agent for policy type
     # parameterized-RedAgentvsRLBlueAgent
     # tabular-RedAgentvsRLBlueAgent
-    if args.policy_type not in ["parameterized", "tabular"]:
+    if args.policy_type not in ["parameterized", "tabular", "actor_critic"]:
         raise ValueError(f"Invalid policy type {args.policy_type}.")
 
     max_net = args.network_size_compatibility

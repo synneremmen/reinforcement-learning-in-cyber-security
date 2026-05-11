@@ -181,6 +181,7 @@ class RLTableHandler:
         writer.add_scalar("charts/number_valid_targets", self.num_valid_targets, self.global_step)
         impact_ratio = (self.number_of_impacted_valid_targets / self.num_valid_targets) if self.num_valid_targets > 0 else 0.0
         writer.add_scalar("charts/red_impacted_valid_targets_ratio", impact_ratio, self.global_step)
+        writer.add_scalar("charts/epsilon", self.agents[agent]["policy"].epsilon, self.global_step)
         writer.add_scalar("charts/red_learning_rate", self.agents[agent]["policy"].learning_rate, self.global_step)
 
         for phase in ["discovery", "impact"]:
