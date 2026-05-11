@@ -216,7 +216,6 @@ class RLTableHandler:
                         next_obs=self.agents[agent]["obs"][step + 1][env_idx] if step < self.args.num_steps - 1 else self.agents[agent]["next_obs"][env_idx],
                         done=self.dones[step][env_idx],
                         next_action_mask=self.agents[agent]["action_masks"][step + 1][env_idx] if step < self.args.num_steps - 1 else None,
-                        alpha=self.args.alpha,
                         gamma=self.args.gamma
                     )
                     td_updates.append(float(update_value))
