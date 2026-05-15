@@ -387,7 +387,8 @@ class RLPolicyTabular(nn.Module):
         host_obs = host_obs.reshape(self.num_hosts, -1)[:, :8]
         for host_idx in range(self.num_hosts):
             host_features = host_obs[host_idx]
-            type_, sweeped, scanned, discovered, on_host, escalated, impacted = [int(v.item()) for v in host_features[:7]]
+            type_, sweeped, scanned, discovered, on_host, escalated, impacted, visited = [int(v.item()) for v in host_features[:8]]
+
             
             if impacted == 1:
                 curr = 5
@@ -399,11 +400,12 @@ class RLPolicyTabular(nn.Module):
                 curr = 2
             elif sweeped == 1:
                 curr = 1
-            elif on_host:
+            elif on_host == 1:
                 curr = 0
+            else:
+                curr = sweeped # 0 if in obs, else -1
 
-            state.extend([type_, int(on_host), int(curr)])
-
+            state.extend([type_, int(on_host), int(curr), visited])
         state.append(global_att)
         return tuple(state)
 
