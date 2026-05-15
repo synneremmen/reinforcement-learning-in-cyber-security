@@ -277,7 +277,7 @@ class RLParamHandler:
                     param.grad.data.clamp_(-5, 5)  # gradient clipping
             self.agents[agent]["optimizer"].step()
             
-            if self.agents[agent]["policy"].use_target and update // 100 == 0:  # soft update every 100 updates
+            if self.agents[agent]["policy"].use_target and update % 100 == 0:  # soft update every 100 updates
                 self.agents[agent]["policy"].soft_update()
 
     def save_models(self):
