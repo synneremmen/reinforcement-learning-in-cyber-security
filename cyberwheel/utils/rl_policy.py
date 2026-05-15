@@ -390,17 +390,17 @@ class RLPolicyTabular(nn.Module):
             type_, sweeped, scanned, discovered, on_host, escalated, impacted = [int(v.item()) for v in host_features[:7]]
             
             if impacted == 1:
-                curr = 4
+                curr = 5
             elif escalated == 1:
-                curr = 3
+                curr = 4
             elif discovered == 1:
-                curr = 2
+                curr = 3
             elif scanned == 1:
+                curr = 2
+            elif sweeped == 1:
                 curr = 1
-            elif sweeped == 1 or on_host == 1:
+            elif on_host:
                 curr = 0
-            else:
-                curr = -1
 
             state.extend([type_, int(on_host), int(curr)])
 
