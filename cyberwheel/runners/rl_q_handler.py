@@ -15,7 +15,7 @@ import torch
 import os
 import random
 
-Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
+Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done', 'td_error'])
 
 class replay_buffer():
     def __init__(self, capacity, agents):
@@ -25,7 +25,11 @@ class replay_buffer():
         self.buffer[agent].append(experience)
 
     def sample(self, batch_size, agent):
-        return random.sample(self.buffer[agent], batch_size)
+        td_errors = np.array([exp.td_error for exp in self.buffer[agent]])
+        probabilities = td_errors / td_errors.sum() if td_errors.sum() > 0 else np.ones(len(self.buffer[agent])) / len(self.buffer[agent])  # uniform
+        sample_indicies = np.random.choice(len(self.buffer[agent]), batch_size, p=probabilities)
+        # return random.sample(self.buffer[agent], batch_size)
+        return [self.buffer[agent][i] for i in sample_indicies]
 class RLParamHandler:
 
     def __init__(self, envs: VectorEnv, args, agents: dict, static_agents=[]):
@@ -78,13 +82,14 @@ class RLParamHandler:
         return action if action in ["discovery", "impact"] else "other"
 
     def store_memory(self, experience: Experience, agent):
-        state, action, reward, next_state, done = experience
+        state, action, reward, next_state, done, td_error = experience
         state = torch.tensor(state, dtype=torch.float32, device=self.device)
         next_state = torch.tensor(next_state, dtype=torch.float32, device=self.device)
         action = torch.tensor([action], dtype=torch.long)
         reward = torch.tensor([reward], dtype=torch.float32, device=self.device)
         done = torch.tensor([done], dtype=torch.float32, device=self.device)
-        experience = Experience(state, action, reward, next_state, done)
+        td_error = torch.tensor(td_error, dtype=torch.float32, device=self.device)
+        experience = Experience(state, action, reward, next_state, done, td_error)
         self.replay_buffer.push(experience, agent=agent)
         
     def define_multiagent_variables(self):
@@ -152,7 +157,8 @@ class RLParamHandler:
                 self.agents[agent]["rewards"][step][env_idx] = torch.tensor(info[f"{agent}_reward"][env_idx]).to(self.device).view(-1)
             
             reward_val = self.agents[agent]["rewards"][step][env_idx].item()
-            experience = Experience(state=self.agents[agent]["obs"][step][env_idx], action=policy_action[agent][env_idx], reward=reward_val, next_state=obs[agent][env_idx], done=done[env_idx])
+            td_error = reward_val + self.args.gamma * self.agents[agent]["policy"].get_value(self.agents[agent]["next_obs"], use_target=True) - self.agents[agent]["policy"].get_value(self.agents[agent]["obs"][step][env_idx], self.agents[agent]["actions"][step][env_idx])
+            experience = Experience(state=self.agents[agent]["obs"][step][env_idx], action=policy_action[agent][env_idx], reward=reward_val, next_state=obs[agent][env_idx], done=done[env_idx], td_error=td_error)
             self.store_memory(experience, agent=agent)
 
             # self.agents[agent]["episode_rewards"][env_idx] += reward_val
