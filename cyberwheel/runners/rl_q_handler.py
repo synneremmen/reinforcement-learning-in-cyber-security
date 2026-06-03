@@ -20,6 +20,8 @@ Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state'
 class replay_buffer():
     def __init__(self, capacity, agents):
         self.buffer = {agent: deque(maxlen=capacity) for agent in agents}
+        self.beta = 0.4
+        self.capacity = capacity
 
     def push(self, experience, agent):
         self.buffer[agent].append(experience)
@@ -27,6 +29,8 @@ class replay_buffer():
     def sample(self, batch_size, agent):
         td_errors = np.array([abs(exp.td_error)+1e-8 for exp in self.buffer[agent]])
         probabilities = td_errors / td_errors.sum() if td_errors.sum() > 0 else np.ones(len(self.buffer[agent])) / len(self.buffer[agent])  # uniform
+        unscaled_weights = (self.capacity * torch.tensor(probabilities))**(-self.beta)
+        weights = unscaled_weights / unscaled_weights.max() if unscaled_weights is not None else torch.ones(len(self.buffer[agent]))
         sample_indicies = np.random.choice(len(self.buffer[agent]), batch_size, p=probabilities)
         # return random.sample(self.buffer[agent], batch_size)
         """
@@ -37,7 +41,13 @@ class replay_buffer():
         rank_probabilities = (1 / (ranks + 1)) / np.sum(1 / (ranks + 1))  # higher td_error gets higher probability
         sample_indices = np.random.choice(len(self.buffer[agent]), batch_size, p=rank_probabilities)
         """
-        return [self.buffer[agent][i] for i in sample_indicies]
+        self.sample_indicies = sample_indicies
+        return [self.buffer[agent][i] for i in sample_indicies], weights[sample_indicies]
+
+    def update_priorities(self, agent, td_errors):
+        for idx, td_error in zip(self.sample_indicies, td_errors):
+            exp = self.buffer[agent][int(idx)]
+            self.buffer[agent][int(idx)] = Experience(exp.state, exp.action, exp.reward, exp.next_state, exp.done, float(td_error))
 class RLParamHandler:
 
     def __init__(self, envs: VectorEnv, args, agents: dict, static_agents=[]):
@@ -63,7 +73,7 @@ class RLParamHandler:
                 { 'params': list(self.agents[agent]["policy"].model.parameters()),  'lr': float(self.args.learning_rate),  'eps': 1e-3 },
             ])
             self.agents[agent]["scheduler"] = CosineAnnealingLR(self.agents[agent]["optimizer"], T_max=self.args.total_timesteps)
-            self.agents[agent]["lossfn"] = torch.nn.MSELoss()
+            self.agents[agent]["lossfn"] = torch.nn.MSELoss(reduction="none")
 
         if self.load:
             print(self.args.experiment_name)
@@ -264,7 +274,7 @@ class RLParamHandler:
         # Convert mb_inds to CPU tensor for proper indexing
         # mb_inds = torch.from_numpy(mb_inds).long()
         for agent in self.agents:
-            experience = self.replay_buffer.sample(self.args.batch_size, agent)
+            experience, weights = self.replay_buffer.sample(self.args.batch_size, agent)
             batch: Experience = Experience(*zip(*experience))
 
             obs = torch.stack(batch.state).to(self.device)
@@ -279,7 +289,11 @@ class RLParamHandler:
                 next_q_values = self.agents[agent]["policy"].get_value(next_obs, use_target=True)
     
             target = rewards + (1 - dones) * self.args.gamma * next_q_values
-            self.agents[agent]["loss"] = self.agents[agent]["lossfn"](q_values, target)
+            weights = torch.as_tensor(weights, dtype=q_values.dtype, device=self.device).view_as(target)
+            loss = self.agents[agent]["lossfn"](q_values, target)
+            self.agents[agent]["loss"] = (loss * weights).mean() # importance sampling weights for prioritized replay, mean as MSE returns only SE as reduction="none"
+
+            self.replay_buffer.update_priorities(agent=agent, td_errors=(target - q_values).detach().cpu().numpy())
 
     def backpropagate(self, update):
         for agent in self.agents:
