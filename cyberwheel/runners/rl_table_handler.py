@@ -28,7 +28,7 @@ class RLTableHandler:
             self.agents[agent]["policy"] = RLPolicyTabular(self.agents[agent]["max_action_space_size"], self.agents[agent]["shape"], self.args)
 
         if self.load:
-            self.load_models()
+            self.load_models(self.args.load_from_experiment)
 
     def _reset_red_diagnostics(self):
         self.red_action_attempts = defaultdict(int)
@@ -435,7 +435,7 @@ class RLTableHandler:
             for parent_idx in parent_indices:
                 parent_val = values[host_offset + parent_idx]
                 num_children = repeats[parent_idx]
-                new_values = torch.cat([new_values, (parent_val / num_children).unsqueeze(0)])
+                new_values = torch.cat([new_values, parent_val.unsqueeze(0)])
 
         # append last action "nothing" value at the end
         new_values = torch.cat([new_values, nothing_val]) # nothing (last action)
@@ -447,7 +447,7 @@ class RLTableHandler:
             )
 
         if method == "softmax":
-            new_action_values = self.invert_softmax(new_values, mean, std, target_min, target_max)
+            new_action_values = self.invert_softmax(new_values, target_min, target_max)
             # print(
             #     f"[expand] old_range=({target_min.item():.4f}, {target_max.item():.4f}) -> "
             #     f"new_range=({new_action_values.min().item():.4f}, {new_action_values.max().item():.4f})"
@@ -457,20 +457,10 @@ class RLTableHandler:
         # print("New action values:", new_action_values)
         return new_action_values
     
-    def invert_softmax(self, probs, mean, std, target_min, target_max):
-        log_values = torch.log(probs + 1e-9) 
+    def invert_softmax(self, probs, target_min, target_max):
+        log_values = torch.log(probs + 1e-10) 
         log_min = torch.min(log_values)
-        log_max = torch.max(log_values)
-        log_span = log_max - log_min
-        target_span = target_max - target_min
-
-        if log_span > 1e-12 and target_span > 1e-12:
-            values = (log_values - log_min) * (target_span / log_span) + target_min
-        elif std > 1e-12:
-            values = (log_values - log_values.mean()) * (std / (log_values.std() + 1e-12)) + mean
-        else:
-            values = torch.full_like(log_values, mean)
-        return values
+        return (log_values - log_min) / (target_max - target_min)
 
 
 # path = "/Users/synneandreassen/Documents/MasterMaskinlæringCode/INF399/Environments/cyberwheel/cyberwheel/data/models/TableRLRedAgentvsRLBlueAgent/red_agent.pt"

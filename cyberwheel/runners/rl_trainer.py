@@ -152,7 +152,7 @@ class RLTrainer:
                 elif isinstance(self.handler, RLParamHandler):
                     checkpoint = loaded_models[agent]
                     state_dict = checkpoint["state_dict"] if isinstance(checkpoint, dict) and "state_dict" in checkpoint else checkpoint
-                    hidden_layers = RLPolicyParameterized.hidden_layers_from_state_dict(state_dict)
+                    hidden_layers = self.handler.hidden_layers_from_state_dict(state_dict)
                     if isinstance(checkpoint, dict):
                         checkpoint_hidden_layers = checkpoint.get("architecture", {}).get("hidden_layers")
                         if checkpoint_hidden_layers is not None and list(checkpoint_hidden_layers) != list(hidden_layers):

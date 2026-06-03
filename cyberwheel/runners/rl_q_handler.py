@@ -25,10 +25,18 @@ class replay_buffer():
         self.buffer[agent].append(experience)
 
     def sample(self, batch_size, agent):
-        td_errors = np.array([exp.td_error for exp in self.buffer[agent]])
+        td_errors = np.array([abs(exp.td_error)+1e-8 for exp in self.buffer[agent]])
         probabilities = td_errors / td_errors.sum() if td_errors.sum() > 0 else np.ones(len(self.buffer[agent])) / len(self.buffer[agent])  # uniform
         sample_indicies = np.random.choice(len(self.buffer[agent]), batch_size, p=probabilities)
         # return random.sample(self.buffer[agent], batch_size)
+        """
+        or can use rank instead
+        sorted_indices = np.argsort(td_errors)[::-1]  # sort by td_error in descending order
+        ranks = np.empty_like(sorted_indices)
+        ranks[sorted_indices] = np.arange(len(td_errors))  # assign ranks based on sorted indices
+        rank_probabilities = (1 / (ranks + 1)) / np.sum(1 / (ranks + 1))  # higher td_error gets higher probability
+        sample_indices = np.random.choice(len(self.buffer[agent]), batch_size, p=rank_probabilities)
+        """
         return [self.buffer[agent][i] for i in sample_indicies]
 class RLParamHandler:
 
@@ -59,7 +67,7 @@ class RLParamHandler:
 
         if self.load:
             print(self.args.experiment_name)
-            self.load_models()
+            self.load_models(self.args.load_from_experiment)
 
     def _reset_red_diagnostics(self):
         self.red_action_attempts = defaultdict(int)
@@ -88,7 +96,7 @@ class RLParamHandler:
         action = torch.tensor([action], dtype=torch.long)
         reward = torch.tensor([reward], dtype=torch.float32, device=self.device)
         done = torch.tensor([done], dtype=torch.float32, device=self.device)
-        td_error = torch.tensor(td_error, dtype=torch.float32, device=self.device)
+        td_error = float(td_error)
         experience = Experience(state, action, reward, next_state, done, td_error)
         self.replay_buffer.push(experience, agent=agent)
         
@@ -319,6 +327,27 @@ class RLParamHandler:
 
         return agent_paths
     
+    def hidden_layers_from_state_dict(self, state_dict):
+        # Check if this is a dueling network by looking for dueling-specific heads
+        is_dueling = any(k.startswith("model.shared.") for k in state_dict.keys())
+
+        if is_dueling:
+            # For dueling network, extract shared layer sizes
+            layer_sizes = []
+            i = 0
+            while f"model.shared.{i}.weight" in state_dict:
+                layer_sizes.append(state_dict[f"model.shared.{i}.weight"].shape[0])
+                i += 2  # skip ReLU (no weights)
+            return layer_sizes
+        else:
+            # For non-dueling network, extract model layer sizes (excluding output layer)
+            layer_sizes = []
+            i = 0
+            while f"model.model.{i}.weight" in state_dict:
+                layer_sizes.append(state_dict[f"model.model.{i}.weight"].shape[0])
+                i += 2  # skip ReLU (no weights)
+            return layer_sizes[:-1] 
+    
     def load_models(self, experiment_name):
         for agent in self.agents:
             if self.args.nrec:
@@ -333,7 +362,7 @@ class RLParamHandler:
             if os.path.exists(agent_path):
                 checkpoint = torch.load(agent_path, map_location=torch.device(self.device))
                 state_dict = checkpoint["state_dict"] if isinstance(checkpoint, dict) and "state_dict" in checkpoint else checkpoint
-                inferred_hidden_layers = RLPolicyParameterized.hidden_layers_from_state_dict(state_dict)
+                inferred_hidden_layers = self.hidden_layers_from_state_dict(state_dict)
                 print(f"Inferred hidden layers from state_dict: {inferred_hidden_layers}")
                 hidden_layers = None
                 if isinstance(checkpoint, dict):
@@ -446,7 +475,9 @@ class RLParamHandler:
         abstract_policy.model.eval()
         self.agents["red"]["policy"].model.train()
         print(f"Running for {args.kl_divergence_steps} steps with {num_updates} updates of KL divergence loss.")
-        for _ in range(num_updates):
+        # for _ in range(num_updates):
+        prev_loss = deque([float('inf')], maxlen=10000) # early stopping if KL divergence loss is very small for 10000 consecutive updates
+        while sum(prev_loss)/len(prev_loss) > 0.01 and global_step < 2000000:
             self.reset()
             obs = self.agents["red"]["next_obs"]
             for step in range(self.args.num_steps):
@@ -488,4 +519,5 @@ class RLParamHandler:
                 kl_loss.backward()
                 optimizer.step()
                 global_step += 1
+                prev_loss.append(kl_loss.item())
         return self.agents["red"]["policy"].model

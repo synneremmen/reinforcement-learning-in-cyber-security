@@ -47,7 +47,7 @@ class RLHandler:
             # TODO: Reconfigure LR
 
         if self.args.load:
-            self.load_models()
+            self.load_models(self.args.load_from_experiment)
 
     def _reset_red_diagnostics(self):
         self.red_action_attempts = defaultdict(int)
@@ -321,6 +321,15 @@ class RLHandler:
             agent_paths[agent] = agent_path
         return agent_paths
     
+    def hidden_layers_from_state_dict(self, state_dict):
+        # Check if this is a dueling network by looking for dueling-specific heads
+        layer_sizes = []
+        i = 0
+        while f"actor.{i}.weight" in state_dict:
+            layer_sizes.append(state_dict[f"actor.{i}.weight"].shape[0])
+            i += 2  # skip ReLU (no weights)
+        return layer_sizes[:-1] 
+    
     def load_models(self, experiment_name):
         for agent in self.agents:
             if self.args.nrec:
@@ -333,7 +342,14 @@ class RLHandler:
             print(f"Loading {agent} agent from: {agent_path}")
 
             if os.path.exists(agent_path):
-                self.agents[agent]["policy"].load_state_dict(torch.load(agent_path, map_location=self.device))
+                state_dict = torch.load(agent_path, map_location=self.device)
+                hidden_layers = self.hidden_layers_from_state_dict(state_dict)
+                self.agents[agent]["policy"] = RLPolicyActorCritic(
+                    self.agents[agent]["max_action_space_size"], 
+                    self.agents[agent]["shape"]
+                ).to(self.device)
+                self.agents[agent]["policy"].hidden_layers = hidden_layers
+                self.agents[agent]["policy"].load_state_dict(state_dict)
                 print(f"Loaded model for agent '{agent}' from '{agent_path}'")
                 self._reset_red_diagnostics()
             else:
@@ -357,18 +373,48 @@ class RLHandler:
             self.agents[agent]["resets"] = np.array(reset[agent])
             self.agents[agent]["next_obs"] = torch.Tensor(self.agents[agent]["resets"]).to(self.device)
 
+    def get_action_mapping(self, path="/cyberwheel/data/configs/red_agent/rl_red_complex.yaml"):
+        complex_path = Path(path)
+        if not complex_path.exists():
+            complex_path = files("cyberwheel.data.configs.red_agent").joinpath("rl_red_complex.yaml")
+
+        abstract_path = files("cyberwheel.data.configs.red_agent").joinpath("rl_red_agent.yaml")
+
+        with open(abstract_path, "r") as f:
+            abstract_config = yaml.safe_load(f)
+        with open(complex_path, "r") as f:
+            complex_config = yaml.safe_load(f)
+
+        abstract_actions = list(abstract_config["actions"].keys())
+        phase_counts = {phase: 0 for phase in abstract_actions}
+
+        for action_class in complex_config["actions"].values():
+            phase = action_class["phase"]
+            if phase not in phase_counts:
+                raise ValueError(f"Unknown phase '{phase}' in complex red agent config")
+            phase_counts[phase] += 1
+
+        self.mapping = phase_counts
+        self.abstract_action_order = abstract_actions
 
     def expand_model(self, abstract_policy, args, writer=None):
         print(f"Expanding model from action space {abstract_policy.action_space_shape} to {self.agents['red']['policy'].action_space_shape} using method '{args.method}'")
         # print("-- Hidden layers before expansion: ", self.agents["red"]["policy"].hidden_layers)
         if args.method == "copy_params":
-            new_model = self.agents["red"]["policy"].copy_params(old_policy=abstract_policy, mapping=self.mapping)
+            new_actor = self.agents["red"]["policy"].copy_params(old_policy=abstract_policy, mapping=self.mapping)
         elif args.method == "increase_depth":
-            new_model = self.agents["red"]["policy"].increase_depth(old_policy=abstract_policy, reuse_model=args.reuse_model)
+            new_actor = self.agents["red"]["policy"].increase_depth(old_policy=abstract_policy, reuse_model=args.reuse_model)
         elif args.method == "kl_divergence":
-            new_model = self.policy_distallation(abstract_policy, args, writer=writer)
+            new_actor = self.policy_distallation(abstract_policy, args, writer=writer)
         else:
             raise ValueError("Invalid expansion method specified. Use 'copy_params', 'increase_depth' or 'kl_divergence'.")
         
         # print("-- Hidden layers after expansion: ", self.agents["red"]["policy"].hidden_layers)
-        self.agents["red"]["policy"].model = new_model
+        self.agents["red"]["policy"].actor = new_actor
+        self.agents["red"]["optimizer"] = optim.Adam([
+                    { 'params': list(self.agents["red"]["policy"].actor.parameters()),  'lr': float(self.args.actor_lr),  'eps': 1e-5 },
+                    { 'params': list(self.agents["red"]["policy"].critic.parameters()), 'lr': float(self.args.critic_lr), 'eps': 1e-5 },
+                ])
+        if self.args.anneal_lr == 'cosine_restarts':
+            self.agents["red"]["scheduler"] = optim.lr_scheduler.CosineAnnealingWarmRestarts(self.agents["red"]["optimizer"], T_0=int(self.args.save_frequency), T_mult=int(self.args.restart_Tmult), eta_min=float(self.args.min_lr), last_epoch=-1) if self.args.anneal_lr == 'cosine_restarts' else None
+        

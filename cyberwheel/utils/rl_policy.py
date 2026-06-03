@@ -184,6 +184,8 @@ class RLPolicyParameterized(nn.Module):
 
     def get_value(self, obs, actions=None, action_masks=None, use_target=False):
         """Get Q-values using either main or target network. use_target=True for bootstrapping in DQN."""
+        if obs.dim() == 1:
+            obs = obs.unsqueeze(0)
         model = self.target_model if use_target and self.use_target else self.model
         q_values = model.forward(obs)
         
@@ -195,8 +197,14 @@ class RLPolicyParameterized(nn.Module):
             q_vals = q_values.max(1)[0].detach().unsqueeze(1)
             # values = torch.max(q_values, dim=1).values.reshape(-1, 1)
         else:
+            actions = torch.as_tensor(actions, dtype=torch.long, device=q_values.device)
+            if actions.dim() == 0:
+                actions = actions.unsqueeze(0)
             if actions.dim() == 1:
                 actions = actions.unsqueeze(1)
+            if actions.shape[0] != q_values.shape[0]:
+                raise ValueError(f"Batch size of actions {actions.shape[0]} does not match batch size of Q-values {q_values.shape[0]}.")
+                actions = actions.reshape(q_values.shape[0], -1)
             q_vals = q_values.gather(1, actions)
             # values = q_values.gather(1, action.view(-1, 1))
         if float("-inf") in q_vals:
@@ -207,7 +215,7 @@ class RLPolicyParameterized(nn.Module):
     
     def get_probabilities(self, obs, mode="teacher", mapping=None, num_hosts=None, expand_teacher_probs=False):
         q_values = self.model.forward(obs)
-        temperature = 1.0
+        temperature = 0.01
         q_values = q_values / temperature
         if mode == "teacher":
             probs = torch.nn.functional.softmax(q_values, dim=1)
@@ -242,8 +250,8 @@ class RLPolicyParameterized(nn.Module):
             logits = logits.masked_fill(~action_mask, float("-inf"))
 
         if action is None:
-            probs = Categorical(logits=logits)
-            action = probs.sample() # randomization
+            action = self.greedy_action(obs, action_mask)
+            # action = probs.sample() # randomization
             
         value = self.get_value(obs, action)
         return action, None, None, value
@@ -300,7 +308,7 @@ class RLPolicyParameterized(nn.Module):
                         curr_count = values[i]
                         end_idx = out_idx + curr_count
                         # action shape x 64
-                        new_weights = old_layer.weight[i, :] / curr_count # get old weight
+                        new_weights = old_layer.weight[i, :] # get old weight
                         new_bias = old_layer.bias[i] # get old bias
                         new_layer.weight[out_idx:end_idx, :].copy_(new_weights.repeat(curr_count, 1))
                         new_layer.bias[out_idx:end_idx].copy_(new_bias)
